@@ -65,8 +65,10 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 | `judge` | 재판장 에닉 | normal, stern |
 | `prosecutor` | 검사 노벨 | normal, stern |
 | `me` / `me_new` | 변호인 404 덩기덕(기본 / 신의상) | normal, confident, shock |
-| `nayuta` | 피고 나유타 | normal, sad, smile |
-| `johan` · `cecil` · `hongryeon` | 1심 증인 요한·세실·홍련 | normal + 2표정 |
+| `nayuta` | 피고 나유타 | normal, sad, smile(평상시 감은 눈), open(눈을 뜬 얼굴, 결정적 장면) |
+| `johan` · `cecil` · `hongryeon` · `snowwhite` | 1심 증인 요한·세실·홍련·스노우 화이트 | normal + 2표정 |
+
+⚠ 나유타 초상은 게임용 그림(`assets/portraits/nayuta_*.png`)을 직접 고친 판이다(흰 속눈썹). `make_portraits.py --clean-only`로 나유타를 다시 만들지 않는다.
 
 이격(같은 인물의 다른 버전)은 `data/case1.js`의 `variants`에 적고, 그림은 `assets/portraits/<이격 id>_<표정>.png`로 넣는다. 플레이어가 타이틀의 **의상**에서 고른다. 고른 이격에 그 표정 그림이 없으면 기본 그림을 쓴다. 지금은 `me` ↔ `me_new`(덩기덕 기본 · 신의상). 아니스: 스타 그림(`anis_star_*`)은 아니스가 나오는 심에서 쓴다.
 
@@ -84,7 +86,8 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 | 증거 받기 | `{ op: 'give', id: 'e3' }` |
 | 표시·이동 | `{ op: 'label', id }` · `{ op: 'goto', id }` |
 | 연출 | `{ op: 'fx', kind: 'stamp' \| 'shake' \| 'flash', text }` |
-| 배경 | `{ op: 'bg', id: 'court' \| 'void' \| 'nightmare' \| 'lobby' \| 'night' }` (법정·2D 세계·악몽·대기실·밤 골목) |
+| 배경 | `{ op: 'bg', id }` — `court`·`void`·`nightmare`·`lobby`·`night`는 정해진 배경, 그 밖의 id는 `assets/bg/<id>.png`(지금 `edenlab`·`coffin`·`battle`) |
+| 조사 | `{ op: 'investigate', id, start, places: { 장소id: { name, bg, who, desc, move: [장소id], enter: [대사…], spots: [{ name, x, y, w, h, needs, lines: [대사…], again: [대사…] }], talk: [{ topic, needs, lines, again }] } }, done: { needs: [증거id], lines } }` — 좌표는 320×180 기준, `needs`의 증거를 가져야 그 지점·주제·장소가 열린다. 조사 중 `give`는 "새 증거품" 카드로 보인다 |
 | 초상 숨기기 | `{ op: 'hide' }` |
 | 저장 지점 | `{ op: 'save' }` (여기서 하트가 다시 다 찬다) |
 | 끝 | `{ op: 'end', result: 'win', title, text }` |
