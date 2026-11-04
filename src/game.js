@@ -265,7 +265,8 @@
     if (muted) return null;
     if (S.scene === 'title' || S.scene === 'skins') return 'title';
     if (S.scene !== 'play' || S.mode === 'chapter') return null;
-    if (S.bg === 'void' || S.bg === 'nightmare') return 'mystery';
+    if (S.bg === 'void' || S.bg === 'nightmare' || S.bg === 'night') return 'mystery';
+    if (S.bg === 'lobby') return 'title';
     if (S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand) return 'cross';
     return 'court';
   }
@@ -380,7 +381,8 @@
         return true;
       }
       case 'bg': S.bg = op.id; return false;
-      case 'save': save(); return false;
+      // 저장 지점(모순을 하나 풀 때마다)에서 하트를 다시 채운다. 앞 증언의 실수가 뒤 증언까지 이어지지 않게
+      case 'save': S.patience = MAX_PATIENCE; save(); return false;
       case 'chapter': S.portrait = null; S.chapter = op; S.mode = 'chapter'; return true;
       case 'testimony': startTestimony(op); return true;
       case 'demand':
@@ -742,9 +744,41 @@
       text(s, x + 5, H - y, i % 3 ? '#9a6070' : COL.red, { scale: 10 / 12 });
     }
   }
+  // 휴정 장면: 법정 옆 작은 방. 자판기, 벤치, 창, 쌓인 상자(세실 말로는 창고)
+  function drawLobby() {
+    rect(0, 0, W, H, '#d9c7a4');
+    for (let x = 0; x < W; x += 24) rect(x, 0, 12, 112, '#d2bd96');
+    rect(0, 104, W, 8, '#a8845a'); rect(0, 104, W, 2, '#c49d6c');
+    rect(0, 112, W, 68, '#8a6a4a');
+    for (let x = 0; x < W; x += 20) rect(x, 112, 1, 68, '#7a5c3e');
+    // 창: 바깥은 방주의 인공 하늘
+    rect(118, 18, 84, 48, '#6e5638'); rect(121, 21, 78, 42, '#9fd0e8'); rect(159, 21, 2, 42, '#6e5638'); rect(121, 41, 78, 2, '#6e5638');
+    rect(126, 26, 18, 4, '#e8f4fa'); rect(170, 30, 22, 4, '#e8f4fa');
+    // 자판기: 깜박이는 불빛
+    rect(18, 30, 46, 82, '#3a6ea8'); rect(22, 34, 38, 40, '#bfe0f0');
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) rect(26 + j * 12, 38 + i * 12, 8, 8, ['#e0505a', '#7ee08a', '#e8c060'][(i + j) % 3]);
+    rect(22, 80, 38, 6, '#1e3a5a'); rect(48, 90, 8, 4, Math.floor(S.t * 2) % 2 ? '#e8c060' : '#6a5a30');
+    // 벤치와 쌓인 상자
+    rect(220, 86, 84, 6, '#6e4626'); rect(224, 92, 4, 18, '#5a3a1e'); rect(296, 92, 4, 18, '#5a3a1e');
+    rect(88, 76, 22, 30, '#b48a58'); rect(92, 62, 18, 16, '#c49d6c'); rect(88, 76, 22, 2, '#8a6a42');
+  }
+  // 에필로그 장면: 불 꺼진 골목의 밤
+  function drawNight() {
+    rect(0, 0, W, H, '#0a0c18');
+    for (let i = 0; i < 30; i++) rect((i * 71) % W, (i * 29) % 70, 1, 1, i % 4 ? '#3a3f6a' : '#c4e0f4');
+    // 초승달: 큰 원에서 오른쪽으로 비킨 원을 빼서 그린다
+    for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) if (dx * dx + dy * dy <= 64 && (dx - 5) ** 2 + (dy + 2) ** 2 > 49) rect(38 + dx, 34 + dy, 1, 1, '#e0dcc4');
+    for (const [x, w, h] of [[0, 56, 46], [56, 40, 34], [96, 72, 58], [168, 48, 40], [216, 104, 52]]) {
+      rect(x, 112 - h, w, h, '#161a2c'); rect(x, 112 - h, w, 1, '#262b44');
+      for (let wy = 112 - h + 8; wy < 106; wy += 12) for (let wx = x + 6; wx < x + w - 8; wx += 12) rect(wx, wy, 4, 6, (wx * 3 + wy * 5) % 7 === 0 ? '#c8a850' : '#22273c');
+    }
+    rect(0, 112, W, 68, '#101320'); rect(0, 112, W, 1, '#2a2f4a');
+  }
   function drawCourt() {
     if (S.bg === 'void') { drawVoid(); return; }
     if (S.bg === 'nightmare') { drawNightmare(); return; }
+    if (S.bg === 'lobby') { drawLobby(); return; }
+    if (S.bg === 'night') { drawNight(); return; }
     const bg = asset('bg:court', 'assets/bg/court.png', (im) => coverFrom(im, W, H));
     if (bg) { g.drawImage(bg, 0, 0, W, H); return; }
     rect(0, 0, W, H, COL.wall);

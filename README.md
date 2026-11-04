@@ -84,7 +84,9 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 | 증거 받기 | `{ op: 'give', id: 'e3' }` |
 | 표시·이동 | `{ op: 'label', id }` · `{ op: 'goto', id }` |
 | 연출 | `{ op: 'fx', kind: 'stamp' \| 'shake' \| 'flash', text }` |
-| 저장 지점 | `{ op: 'save' }` |
+| 배경 | `{ op: 'bg', id: 'court' \| 'void' \| 'nightmare' \| 'lobby' \| 'night' }` (법정·2D 세계·악몽·대기실·밤 골목) |
+| 초상 숨기기 | `{ op: 'hide' }` |
+| 저장 지점 | `{ op: 'save' }` (여기서 하트가 다시 다 찬다) |
 | 끝 | `{ op: 'end', result: 'win', title, text }` |
 
 없는 인물·증거·label을 가리키면 타이틀 왼쪽 위에 "데이터 오류 N건"이 뜨고, 브라우저 콘솔에 목록이 나온다.

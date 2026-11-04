@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """법정 배경 · 증거품 아이콘 생성 (고려대 LLM 이미지 모델 경유).
 
-  tools/make_assets.py            # 없는 것만 생성
+  tools/make_assets.py            # 없는 아이콘만 생성
+  tools/make_assets.py --bg       # 법정 배경도 다시 저장(주의: 지금 배경을 덮어씀)
   tools/make_assets.py --force    # 전부 다시
 모델 원본은 assets/raw/ 에, 게임용은 assets/bg/court.png · assets/evidence/<id>.png 에 저장한다.
 """
@@ -30,6 +31,7 @@ ICONS = {
     "e4": "a glowing purple data chip with a comet-shaped flame streak symbol",
     "e5": "one large glowing green bullet cartridge standing inside a small glass case",
     "e6": "an opened ancient stone coffin seen at an angle, empty inside",
+    "e7": "a small pile of several glowing hexagonal mechanical cores lying on a cloth, carefully set aside",
 }
 
 
@@ -44,13 +46,15 @@ def draw(prompt, dest, ratio):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--bg", action="store_true")
     a = ap.parse_args()
     RAW.mkdir(parents=True, exist_ok=True)
 
+    # 배경은 --bg 를 줄 때만 건드린다. 아이콘만 만들다가 지금 배경(bg_mass_2)을 어두운 옛 배경으로 덮어쓰지 않도록
     raw_bg, out_bg = RAW / "bg_court.png", ROOT / "assets/bg/court.png"
-    if a.force or not raw_bg.exists():
+    if a.bg and (a.force or not raw_bg.exists()):
         draw(BG, raw_bg, "16:9")
-    if raw_bg.exists():
+    if a.bg and raw_bg.exists():
         im = Image.open(raw_bg).convert("RGB")
         im.thumbnail((1920, 1080), Image.LANCZOS)
         im.quantize(colors=128, method=Image.FASTOCTREE).save(out_bg, optimize=True)
