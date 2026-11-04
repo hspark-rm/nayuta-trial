@@ -54,10 +54,9 @@ for (const op of script) {
   if (op.op === 'chapter') node(`${op.text}: ${op.sub || ''}`, 'round');
   if (op.op === 'give' && !script.slice(0, script.indexOf(op)).some((o) => o.op === 'testimony')) { /* 프롤로그 증거는 아래 표로 */ }
   if (op.op === 'testimony') {
-    const ok = op.statements.findIndex((s) => s.present);
-    const ans = Object.keys(op.statements[ok].present)[0];
+    const oks = op.statements.map((s, i) => (s.present ? Object.keys(s.present).map((e) => `${i + 1}번에 「${evName(e)}」`) : [])).flat();
     node(`증언: ${op.title} (${who(op.witness)}, ${op.statements.length}문장)`);
-    node(`${ok + 1}번 증언에 「${evName(ans)}」`, 'diamond');
+    node(oks.join(' 또는 '), 'diamond');
   }
   if (op.op === 'demand') { node(`증거 요구 (${who(op.who)})`); node(`「${evName(op.answer)}」 제시`, 'diamond'); }
   if (op.op === 'end') node(`${op.title}`, 'round');
@@ -131,9 +130,12 @@ const startEv = new Set(C.startEvidence || []);
 for (const op of script) {
   if (op.op === 'give' && !stages.length) startEv.add(op.id);
   if (op.op === 'testimony') {
+    const correct = new Set(op.statements.flatMap((s, i) => Object.keys(s.present || {}).map((e) => `${i}|${e}`)));
     const k = op.statements.findIndex((s) => s.present);
     stages.push({
-      kind: 'testimony', title: op.title, n: op.statements.length, ans: k, ansEv: Object.keys(op.statements[k].present),
+      kind: 'testimony', title: op.title, n: op.statements.length, ans: k, correct,
+      ansSt: new Set([...correct].map((c) => +c.split('|')[0])),
+      ansEv: [...new Set([...correct].map((c) => c.split('|')[1]))],
       gives: op.statements.map((s) => (s.press || []).filter((x) => x.op === 'give').map((x) => x.id)),
       hints: (op.hints || []).length,
       texts: op.statements.map((s) => s.line),
@@ -178,13 +180,13 @@ function play(type) {
           continue;
         }
         const cand = [];
-        for (let i = 0; i < st.n; i++) for (const x of evs) if (!(knowsSt && i !== st.ans) && (type === 'random' || !tried.has(`${i}|${x}`))) cand.push([i, x]);
+        for (let i = 0; i < st.n; i++) for (const x of evs) if (!(knowsSt && !st.ansSt.has(i)) && (type === 'random' || !tried.has(`${i}|${x}`))) cand.push([i, x]);
         if (!cand.length) { // 낼 게 없으면 남은 문장을 캐묻는다
           const i = unpressed.length ? pick(unpressed) : Math.floor(rnd() * st.n);
           pressed.add(i); st.gives[i].forEach((x) => ev.add(x)); continue;
         }
         if (type === 'reader') { const c = softPick(cand.map(([i, x]) => ({ i, x, sc: score(st.texts[i], x) }))); s = c.i; e = c.x; } else [s, e] = pick(cand);
-        if (s === st.ans && st.ansEv.includes(e)) break;
+        if (st.correct.has(`${s}|${e}`)) break;
       } else {
         const knows = (type === 'hint' || type === 'thorough' || type === 'reader') && wrongHere >= 2;
         const cand = evs.filter((x) => type === 'random' || !tried.has(`d|${x}`));
@@ -222,12 +224,12 @@ P();
   const ev = new Set(startEv);
   for (const st of stages) {
     if (st.kind === 'testimony') {
-      const before = ev.size; st.gives.flat().forEach((x) => ev.add(x));
-      P(`- ${st.title}: ${st.n}문장 × 증거 ${before}~${ev.size}개 = 정답 1쌍 / ${st.n * before}~${st.n * ev.size}쌍${st.ansEv.some((x) => !startEv.has(x) && st.gives.flat().includes(x)) ? ' (정답 증거를 캐묻기로 먼저 얻어야 함)' : ''}`);
+      const before = ev.size, had = st.ansEv.some((x) => ev.has(x)); st.gives.flat().forEach((x) => ev.add(x));
+      P(`- ${st.title}: ${st.n}문장 × 증거 ${before}~${ev.size}개 = 정답 ${st.correct.size}쌍 / ${st.n * before}~${st.n * ev.size}쌍${had ? '' : ' (정답 증거를 캐묻기로 먼저 얻어야 함)'}`);
       const all = []; for (let i = 0; i < st.n; i++) for (const x of ev) all.push({ i, x, sc: score(st.texts[i], x) });
       all.sort((a, b) => b.sc - a.sc);
-      const rank = all.findIndex((c) => c.i === st.ans && st.ansEv.includes(c.x)) + 1;
-      P(`  - 낱말 연결로 본 정답 순위: ${rank}위 / ${all.length}쌍 (1위에 가까울수록 증언과 증거가 글로 잘 이어짐)`);
+      const rank = all.findIndex((c) => st.correct.has(`${c.i}|${c.x}`)) + 1;
+      P(`  - 낱말 연결로 본 첫 정답 순위: ${rank}위 / ${all.length}쌍 (1위에 가까울수록 증언과 증거가 글로 잘 이어짐)`);
     } else {
       P(`- ${st.title}: 증거 ${ev.size}개 중 1개`);
       const all = [...ev].map((x) => ({ x, sc: score(st.texts[0], x) })).sort((a, b) => b.sc - a.sc);

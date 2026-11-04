@@ -325,7 +325,8 @@
         SFX.give();
         // 증거품이 변호인 주머니에서 '저절로' 나오는 연출: 카드를 띄우고 변호인이 놀란다
         S.pocket = { id: op.id, t: 0 };
-        const got = { who: null, color: COL.gold, line: `${josa(`「${CASE.evidence[op.id].name}」`, '을', '를')} 증거 목록에 넣었다.` };
+        const nm = CASE.evidence[op.id].name, pt = josa(nm, '을', '를').slice(nm.length);
+        const got = { who: null, color: COL.gold, line: `「${nm}」${pt} 증거 목록에 넣었다.` };
         const react = op.line === false ? [] : [{ who: 'me', face: op.face || 'shock', line: op.line || POCKET_LINES[S.pockets++ % POCKET_LINES.length] }];
         sub([...react, got], () => { S.pocket = null; step(); });
         return true;
@@ -338,7 +339,7 @@
         S.demand = op;
         sub([{ who: op.who, face: op.face, line: op.line }], () => openOverlay('demand'));
         return true;
-      case 'end': S.scene = 'end'; S.end = op; clearSave(); if (op.result === 'win') SFX.ok(); return true;
+      case 'end': S.scene = 'end'; S.end = op; lockInput(); clearSave(); if (op.result === 'win') SFX.ok(); return true;
       default: console.warn('모르는 명령', op); return false;
     }
   }
@@ -355,9 +356,17 @@
     S.line = {
       who: op.who, name: ch ? ch.name : null, voice: ch ? ch.voice : 500,
       color: op.color || (op.testimony ? COL.testimony : think ? COL.think : COL.text),
-      pages, page: 0, shown: 0, lastBlip: 0,
+      pages, page: 0, shown: 0, lastBlip: 0, raw: op.line,
     };
     S.mode = 'line';
+  }
+  // 글꼴이 늦게 로드되면 글자 폭이 바뀌므로 지금 대사의 줄바꿈을 다시 계산한다
+  function rewrapLine() {
+    const l = S.line;
+    if (!l) return;
+    const all = wrap(l.raw, LINE_W), pages = [];
+    for (let i = 0; i < all.length; i += LINES) pages.push(all.slice(i, i + LINES));
+    l.pages = pages; l.page = Math.min(l.page, pages.length - 1); l.shown = Math.min(l.shown, pageLen(l));
   }
   const pageLen = (l) => l.pages[l.page].reduce((n, s) => n + [...s].length, 0);
   function advanceLine() {
@@ -389,12 +398,14 @@
     S.mode = 'cross';
   }
   function crossMove(d) {
+    if (S.mode !== 'cross') return;
     const n = S.test.op.statements.length;
     S.test.idx = (S.test.idx + d + n) % n;
     SFX.select();
     enterCross();
   }
   function crossPress() {
+    if (S.mode !== 'cross') return; // 같은 순간 두 번 눌러도 한 번만
     const t = S.test, st = t.op.statements[t.idx];
     const press = st.press && st.press.length ? st.press : [{ who: t.op.witness, line: '더 할 말은 없어요.' }];
     S.mode = 'idle';
@@ -418,6 +429,7 @@
   }
   function present(id) {
     const ov = S.overlay;
+    if (!ov || id === undefined) return; // 이미 닫혔거나(두 번 누름) 낼 증거가 없음
     if (ov.purpose === 'cross') {
       const st = S.test.op.statements[S.test.idx];
       const to = st.present && st.present[id];
@@ -430,6 +442,7 @@
 
   // ───────── 증거 목록 ─────────
   function openOverlay(purpose) {
+    if (S.overlay) return;
     S.overlay = { purpose, sel: 0 }; // purpose: view | cross | demand
     if (S.mode !== 'line') S.mode = 'idle';
     SFX.select();
@@ -456,7 +469,7 @@
     if (!from) wrongCount = new WeakMap(); // 새 게임이면 힌트 단계도 처음부터
     S.stack = [{ list: CASE.script, pc: from ? from.pc : 0 }];
     S.ev = from ? [...from.ev] : [...(CASE.startEvidence || [])];
-    S.patience = from ? Math.max(from.patience, 1) : MAX_PATIENCE;
+    S.patience = MAX_PATIENCE; // 이어하기·다시하기 모두 하트를 채워서 시작
     S.hinted = from ? !!from.hinted : false;
     S.bg = (from && from.bg) || 'court';
     S.pockets = (from && from.pockets) || 0;
@@ -465,13 +478,17 @@
     S.mode = 'idle';
     step();
   }
-  function gameOver() { S.scene = 'over'; S.overlay = null; S.mode = 'idle'; }
+  function gameOver() { S.scene = 'over'; S.overlay = null; S.mode = 'idle'; lockInput(); }
+  // 엔딩·패소·타이틀로 바뀐 직후 Enter 연타로 화면이 건너뛰어지지 않게 잠깐 입력을 막는다
+  let lockUntil = 0;
+  function lockInput() { lockUntil = performance.now() + 600; }
+  let started = false; // 첫 화면을 그리기 전에는 입력을 받지 않는다
 
   // ───────── 입력 ─────────
   let B = [];
   const pointer = { x: -1, y: -1 };
   function button(x, y, w, h, label, fn, o = {}) {
-    const hot = !o.off && pointer.x >= x && pointer.x < x + w && pointer.y >= y && pointer.y < y + h;
+    const hot = !o.off && (o.sel || (pointer.x >= x && pointer.x < x + w && pointer.y >= y && pointer.y < y + h));
     g.fillStyle = o.off ? '#2a2838' : hot ? COL.gold : (o.bg || COL.box);
     g.fillRect(x, y, w, h);
     g.fillStyle = o.off ? '#3a3850' : COL.gold;
@@ -487,8 +504,9 @@
   cv.addEventListener('pointerleave', () => { pointer.x = pointer.y = -1; });
   // 손가락을 떼면 강조 표시를 지운다(마우스와 달리 위치가 남지 않게)
   cv.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') pointer.x = pointer.y = -1; });
-  cv.addEventListener('pointerdown', (e) => {
+  document.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    if (!started || (S.scene !== 'play' && performance.now() < lockUntil)) return;
     audio();
     if (portraitHeld()) { if (canFull && !isFull()) goFull(); return; }
     const p = toBase(e); pointer.x = p.x; pointer.y = p.y;
@@ -506,12 +524,21 @@
     else if (S.mode === 'stamp') { S.fx.stamp = null; S.mode = 'idle'; step(); }
     else if (S.mode === 'cross') crossMove(1); // 신문 중에 화면을 누르면 다음 증언으로
   }
+  let titleSel = 0; // 타이틀에서 키보드로 고른 버튼: 0 새로 시작, 1 이어하기
   addEventListener('keydown', (e) => {
+    // 길게 누르기 반복, 브라우저 단축키(Cmd/Ctrl+F 등), 세로 화면, 시작 전 입력은 무시한다
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || !started || portraitHeld()) return;
+    if (S.scene !== 'play' && performance.now() < lockUntil) return;
     audio();
     const k = e.key;
     if (k === 'm' || k === 'M') { toggleMute(); return; }
     if (k === 'f' || k === 'F') { toggleSpeed(); return; }
-    if (S.scene === 'title') { if (k === 'Enter' || k === ' ') begin(null); return; }
+    if (S.scene === 'title') {
+      if ((k === 'ArrowUp' || k === 'ArrowDown') && S.saved) { titleSel = 1 - titleSel; SFX.select(); }
+      else if (k === 'Enter' || k === ' ') begin(titleSel === 1 && S.saved ? S.saved : null);
+      e.preventDefault();
+      return;
+    }
     if (S.scene !== 'play') { if (k === 'Enter' || k === ' ') { S.scene === 'over' ? retry() : toTitle(); } return; }
     const ov = S.overlay;
     if (ov) {
@@ -548,7 +575,7 @@
     try { localStorage.setItem('nayuta-trial.mute', muted ? '1' : '0'); } catch (e) { /* 무시 */ }
   }
   function retry() { begin(S.saved ? { ...S.saved, patience: MAX_PATIENCE } : null); }
-  function toTitle() { S.scene = 'title'; }
+  function toTitle() { S.scene = 'title'; titleSel = S.saved ? 1 : 0; lockInput(); }
 
   // ───────── 갱신 ─────────
   function update(dt) {
@@ -715,7 +742,7 @@
       desc.slice(ov.page * per, ov.page * per + per).forEach((s, i) => text(s, 128, 72 + i * 12, COL.text, { scale: DS }));
       if (pages > 1) button(128, 148, 60, 18, `설명 ${ov.page + 1}/${pages}`, () => { ov.page = (ov.page + 1) % pages; SFX.select(); });
     }
-    if (ov.purpose !== 'view') button(192, 148, 54, 18, keyHint('제시', 'Z'), () => present(S.ev[ov.sel]));
+    if (ov.purpose !== 'view') button(192, 148, 54, 18, keyHint('제시', 'Z'), () => present(S.ev[ov.sel]), { off: !S.ev.length });
     if (ov.purpose !== 'demand') button(250, 148, 52, 18, '닫기', closeOverlay);
   }
   function drawStamp() {
@@ -751,8 +778,9 @@
     // 부제 = 나유타의 시그니처 대사
     text(TAGLINE, 160, 50, COL.text, { align: 'center', bold: true, scale: 1.5, outline: COL.ink });
     text(CASE.subtitle || '', 160, 72, COL.dim, { align: 'center' });
-    button(110, 88, 100, 18, '새로 시작', () => begin(null));
-    button(110, 109, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
+    if (!S.saved) titleSel = 0;
+    button(110, 88, 100, 18, '새로 시작', () => begin(null), { sel: titleSel === 0 && pointer.x < 0 });
+    button(110, 109, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved, sel: titleSel === 1 && pointer.x < 0 });
     const sound = muted ? '소리 꺼짐' : '소리 켜짐';
     const hasSkins = Object.keys(CASE.variants || {}).length > 0;
     const row = [[sound, toggleMute]];
@@ -841,7 +869,8 @@
     requestAnimationFrame(loop);
   }
   const fonts = Promise.all([document.fonts.load('12px Galmuri11'), document.fonts.load('12px Galmuri11Bold')]);
-  Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).then(() => requestAnimationFrame(loop));
+  Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).then(() => { started = true; titleSel = S.saved ? 1 : 0; requestAnimationFrame(loop); });
+  fonts.then(rewrapLine).catch(() => {});
 
   // 개발 확인용
   window.__nayuta = { S, step, present, begin, dataErrors };

@@ -25,7 +25,7 @@ window.CASE = {
 
   evidence: {
     e1: { name: '에덴 거래 기록', color: '#e8c060',
-      desc: 'EDEN SPEAR. 깨어난 니힐리스타가 먼저 거래를 청했다. 니힐리스타의 기록에는 오래전부터 "퀸 암살 조건: ① 릴리스의 바디 ② 언체인드"가 적혀 있었다.' },
+      desc: 'EDEN SPEAR. 깨어난 니힐리스타가 먼저 거래를 청했다. 독잔 계획의 뼈대인 "퀸 암살 조건: ① 릴리스의 바디 ② 언체인드"는 오래전부터 니힐리스타의 기록에 있었다.' },
     e2: { name: '퀸 전투 기록', color: '#e0505a',
       desc: 'GODDESS FALL 2부. 니힐리스타가 흡수된 뒤 퀸의 재생이 멈추고 몸이 무너졌다. 스노우 화이트의 사격과 홍련의 일격으로 퀸의 목이 떨어졌다.' },
     e3: { name: '나유타의 질문', color: '#5aa0a0',
@@ -134,7 +134,8 @@ window.CASE = {
             { who: 'johan', face: 'stern', line: '찬성한 게 그 녀석이니까. 같은 말이다.' },
             { who: 'nayuta', line: '소인이 찬성한 것은 사실이오.' },
             { who: 'me', face: 'confident', line: '(찬성한 것과 제안한 것은 다르다. 이 부분은 다시 볼 필요가 있다.)' },
-          ] },
+          ],
+          present: { e1: 'contra1' } },
         { line: '바디에 언체인드를 먹여 퀸을 독살하는 독잔 계획도 결국 나유타 머릿속에서 나온 거다.',
           press: [
             { who: 'me', line: '그 계획을 나유타가 처음 꺼내는 걸 직접 들었습니까?' },
@@ -209,7 +210,7 @@ window.CASE = {
             { who: 'me', line: '퀸에게 넘어갈 때까지 언체인드를 한 번도 받지 못했다고 단정할 수 있나요?' },
             { who: 'cecil', line: '제 오퍼레이터 화면에는 그런 기록이 없었어요.' },
           ],
-          present: { e5: 'contra2' } },
+          present: { e5: 'contra2', e4: 'contra2' } },
         { line: '독잔 뒤에 퀸의 시신에서 릴리바이스 모습의 무언가가 나왔어요. 실패라는 증거죠.',
           press: [
             { who: 'nayuta', face: 'sad', line: '그 점은 소인도 할 말이 없소. 독이 생각보다 약했소.' },
@@ -249,11 +250,11 @@ window.CASE = {
           press: [
             { who: 'hongryeon', line: '그 외침은 쉽게 잊히지 않네. 그 아이 나름의 작별이었겠지.' },
           ] },
-        { face: 'drunk', line: '허나 퀸은 베어도 베어도 곧바로 아물었네. 독 따위는 듣지 않았지.',
+        { face: 'drunk', line: '그 아이가 뛰어들기 전까지, 퀸은 베어도 베어도 곧바로 아물었네.',
           press: [
-            { who: 'me', line: '그건 니힐리스타가 뛰어들기 전인가요, 후인가요?' },
-            { who: 'hongryeon', face: 'drunk', line: '순서라… 물을 너무 마셨는지 흐릿하네.' },
-            { who: 'me', line: '(물을 마셔서 흐릿하다고…?)' },
+            { who: 'me', line: '"뛰어들기 전까지"라면, 그 뒤에는요?' },
+            { who: 'hongryeon', face: 'drunk', line: '그 뒤라… 물을 너무 마셨는지 흐릿하네.' },
+            { who: 'me', line: '(물을 마셔서 흐릿하다고…? 그 뒤가 중요한데.)' },
           ] },
         { face: 'drunk', line: '결국 우리 중 누구도 퀸의 목에 칼끝 하나 대지 못했네.',
           press: [
