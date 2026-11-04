@@ -169,7 +169,8 @@ window.CASE = {
             { who: null, line: '에덴. 방주 밖 지상에 숨겨진 기지다. 수리실에는 기름 냄새와 커피 냄새가 섞여 있다.' },
             { who: 'cecil', line: '어머, 피고랑 변호인이 직접 오셨네요. 재판 전에 현장부터 보겠다는 거죠?' },
             { who: 'me', line: '네. 니힐리스타를 고친 곳이 여기라고 들어서요.' },
-            { who: 'cecil', face: 'smile', line: '마음껏 보세요. 단, 제 커피는 건드리지 말고요.' },
+            { who: 'cecil', line: '…솔직히 방주 재판이라면 협조하고 싶지 않아요. 방주가 에덴한테 한 일을 생각하면요.' },
+            { who: 'cecil', face: 'smile', line: '그래도 덩기덕 씨가 직접 찾아와서 부탁하니까요. 현장은 마음껏 보세요. 단, 제 커피는 건드리지 말고요.' },
             { who: 'nayuta', line: '대협, 궁금한 곳이 있으면 소인이 아는 대로 말씀드리겠소.' },
             { who: null, color: '#e8c060', line: '【조사】 「살펴보기」로 수상한 곳을 누르고, 「이야기하기」로 사람에게 묻자. 단서를 다 모으면 「조사 마치기」를 누른다.' },
           ],
@@ -226,8 +227,15 @@ window.CASE = {
               { who: 'cecil', face: 'shock', line: '그 뒤 일은 잘 몰라요. 저는 리버렐리오한테 기절당했거든요.' },
               { who: 'me', line: '(세실도 다 본 건 아니구나.)' },
             ] },
+            { topic: '방주 재판에 대해', lines: [
+              { who: 'cecil', line: '에덴 사람들은 방주를 안 믿어요. 한 번 배신당했거든요. 방주는 필요할 때만 우리를 찾고, 일이 끝나면 버렸어요.' },
+              { who: 'cecil', line: '그러니 방주 법정 소환장 같은 건 원래 안 받아요.' },
+              { who: 'me', line: '그런데 왜 증언해 주시는 거예요?' },
+              { who: 'cecil', face: 'smile', line: '방주를 위해서가 아니라, 덩기덕 씨를 봐서요. 방주 사람이 아니라 하늘에서 떨어진 사람이니까요.' },
+            ] },
             { topic: '요한에 대해', lines: [
-              { who: 'cecil', line: '내일 검찰 측 증인으로 나온대요. 나유타를 믿지 않는다고 미리 말해 두더라고요.' },
+              { who: 'cecil', line: '내일 검찰 측 증인으로 나온대요. 방주 법정엔 발도 안 들인다더니, 덩기덕 씨 얘기를 하니까 마지못해 나오겠대요.' },
+              { who: 'cecil', line: '대신 나유타를 믿지 않는다고 미리 말해 두더라고요. 방주는 더 안 믿고요.' },
               { who: 'nayuta', line: '소협은 원래 그런 분이오. 그래도 거짓말은 못 하는 분이외다.' },
               { who: 'me', line: '(…거짓말은 안 해도, 짐작으로 말할 수는 있다.)' },
             ] },
@@ -337,7 +345,12 @@ window.CASE = {
 
     { who: 'johan', line: '에덴의 요한이다. 미리 말해 두지. 나는 저 녀석을 믿지 않는다.' },
     { who: 'nayuta', line: '소협은 여전하시구려.' },
+    { who: 'johan', face: 'stern', line: '그리고 하나 더. 방주 법정에 서는 건 이번이 처음이자 마지막이다.' },
     { who: 'judge', line: '증인은 아는 사실만 증언하십시오.' },
+    { who: 'johan', face: 'stern', line: '사실이라. 방주가 에덴을 버릴 때는 사실 따위 묻지도 않더군.' },
+    { who: 'judge', face: 'stern', line: '본 사건과 관계없는 발언입니다.' },
+    { who: 'johan', face: 'stern', line: '…변호인 얼굴 봐서 나온 거다. 묻는 말에만 답하지.' },
+    { who: 'me', line: '(요한은 방주를 증오한다. 그래도 내 부탁 하나로 여기까지 와 줬다.)' },
     {
       op: 'testimony', title: '니힐리스타의 수리', witness: 'johan',
       statements: [
@@ -401,6 +414,8 @@ window.CASE = {
     { who: 'johan', face: 'stern', line: '…무장은 봉인돼 있었다는 건가. 좋다, 수리는 지시대로였다고 치지.' },
     { who: 'johan', line: '하지만 거래는 다르다. 그건 분명히 그 녀석이 꾸민 일이다.' },
     { who: 'prosecutor', face: 'stern', line: '증인, 그 거래에 대해 증언하는 것입니다!' },
+    { who: 'johan', face: 'stern', line: '방주 검사가 시키는 대로 할 생각은 없다.' },
+    { who: 'johan', line: '…변호인이 들어야 할 이야기니까 하는 거다.' },
     { op: 'save' },
     {
       op: 'testimony', title: '에덴에서 맺은 거래', witness: 'johan',
@@ -489,6 +504,9 @@ window.CASE = {
     { op: 'save' },
 
     { who: 'cecil', line: '에덴의 세실이에요. 니힐리스타를 손본 기술 쪽 일이라면 제가 제일 잘 알죠.' },
+    { who: 'cecil', line: '그리고 검사님. 부르면 오는 줄 아시나 봐요? 방주 소환장은 받자마자 커피 받침으로 썼어요.' },
+    { who: 'judge', face: 'stern', line: '증인, 법정을 모독하는 발언은 삼가십시오.' },
+    { who: 'cecil', line: '모독이 아니라 사실이에요. 덩기덕 씨가 부탁하지 않았으면 이 문턱도 안 넘었어요.' },
     { who: 'cecil', face: 'smile', line: '참고로 피고가 법정까지 길을 잃지 않은 건 제가 안내했기 때문이에요.' },
     { who: 'nayuta', face: 'sad', line: '소인은 길치가 아니외다. 길이 소인을 피했을 뿐이오.' },
     {
@@ -516,6 +534,7 @@ window.CASE = {
             { who: 'me', line: '퀸에게 넘어갈 때까지 언체인드를 한 번도 받지 못했다고 단정할 수 있나요?' },
             { who: 'cecil', line: '제 오퍼레이터 화면에는 그런 기록이 없었어요.' },
             { who: 'prosecutor', face: 'stern', line: '기록이 없다는 것은 없었다는 것입니다. 변호인이 뒤집으려면 기록을 내는 것입니다!' },
+            { who: 'cecil', line: '방주 사람들은 늘 그렇게 말하죠. 기록에 없으면 없던 일이라고. 에덴 일도 그렇게 지웠잖아요.' },
             { who: 'me', line: '(화면에 없었다는 것뿐이다. 화면 밖에서 무슨 일이 있었는지가 문제다.)' },
           ],
           present: { e5: 'contra2', e4: 'contra2' } },
@@ -568,6 +587,8 @@ window.CASE = {
     { who: 'johan', face: 'stern', line: '…또 나냐.' },
     { who: 'nayuta', line: '소협, 또 뵙소.' },
     { who: 'johan', face: 'stern', line: '그 호칭 그만둬라.' },
+    { who: 'judge', line: '증인, 이번에는 성실히 응하십시오.' },
+    { who: 'johan', face: 'stern', line: '방주가 성실을 말하나. …변호인, 이번이 마지막이다. 그 뒤로는 방주 문턱 안 넘는다.' },
     {
       op: 'testimony', title: '언체인드를 넘긴 날', witness: 'johan',
       statements: [
@@ -591,6 +612,7 @@ window.CASE = {
             { who: 'johan', face: 'stern', line: '속았다. 그렇게 기록해라.' },
             { who: 'prosecutor', line: '증인이 속았다면 피고가 속인 것입니다. 간단한 추리인 것입니다, 왓슨.' },
             { who: 'judge', line: '기록하겠습니다. "증인은 속았다."' },
+            { who: 'johan', face: 'stern', line: '방주 기록이라. 거기 적힌 걸 믿은 적은 없지만, 마음대로 해라.' },
             { who: 'me', face: 'shock', line: '(이대로 기록되면 나유타는 동료를 속인 사람이 된다…!)' },
           ] },
         { line: '그 탄환이 니힐리스타에게 갈 줄은 꿈에도 몰랐다.',
@@ -629,6 +651,7 @@ window.CASE = {
     { who: 'judge', line: '…확인했습니다. 증인은 "알고 있다"고 말했습니다.' },
     { op: 'fx', kind: 'stamp', text: '이의 있는 것입니다!', color: '#6a3a9a' },
     { who: 'prosecutor', face: 'stern', line: '그렇다면 증인도 공범인 것입니다! 에덴 지휘관까지 한통속인 것입니다!' },
+    { who: 'johan', face: 'stern', line: '방주 검사가 에덴을 입에 올리지 마라. 에덴을 버린 게 누군지 잊었나.' },
     { op: 'fx', kind: 'stamp', text: '이의 있음!' },
     { who: 'me', face: 'confident', line: '공범이 아닙니다. 에덴 지휘관이 알고 승인한 작전입니다! 피고 혼자 꾸민 독단이 아니었다는 뜻입니다!' },
     { who: 'johan', face: 'shock', line: '……' },
