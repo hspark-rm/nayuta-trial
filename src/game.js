@@ -757,9 +757,11 @@
     rect(0, 108, W, 72, COL.floor);
     for (let x = 0; x < W; x += 16) rect(x, 108, 1, 72, '#1c110b');
   }
+  // 증언대: 밝은 법정 배경에 맞춘 밝은 나무색
   function drawStand() {
-    rect(96, 96, 128, 24, COL.wood); rect(96, 96, 128, 3, COL.woodHi);
-    rect(100, 102, 120, 1, COL.wood2); rect(108, 106, 104, 10, COL.wood2);
+    rect(96, 96, 128, 24, '#b98552'); rect(96, 96, 128, 3, '#e0b07a');
+    rect(100, 102, 120, 1, '#8f5f36'); rect(108, 106, 104, 10, '#a3703f');
+    rect(96, 119, 128, 1, '#6e4626');
   }
   function drawPlaceholder(id) {
     const ch = CASE.chars[id] || {};

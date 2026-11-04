@@ -15,6 +15,8 @@ from make_portraits import KU_DRAW, ROOT, RAW, remove_background  # noqa: E402
 STYLE = ("16-bit retro game pixel art, clearly visible chunky square pixels, limited palette, "
          "clean dark outline, no text, no letters, no UI.")
 
+# 참고: 지금 게임 배경(assets/bg/court.png)은 밝은 캐주얼 시안 assets/raw/bg_casual_2.png를 골라 넣은 것이다.
+# 아래 BG는 처음 만든 어두운 배경의 지시문이다. 다시 돌리면 어두운 배경으로 덮어쓰니 주의.
 BG = ("Wide pixel art background of a futuristic underground-city courtroom interior, seen from the front. "
       "A high judge's bench in the back center under a large round emblem. "
       "On the left, a jury box with six ordinary civilians of a sci-fi underground city (casual jackets, hoodies, work uniforms). "
