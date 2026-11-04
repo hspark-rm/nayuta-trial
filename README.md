@@ -44,6 +44,13 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 - 증거: `assets/evidence/<증거 id>.png` (32×32로 줄여 씀)
 - 배경: `assets/bg/court.png` (320×180으로 잘라 씀)
 
+### 원본 그림으로 도트 초상화 만들기 (고려대 LLM)
+
+1. 원본 그림(게임 스크린샷도 됨)을 Dropbox `00. Inbox/nayuta-ref/` 에 `nayuta.png`, `anis.png`, `hongryeon.png` 이름으로 넣는다.
+2. `tools/make_portraits.py --plan` 으로 장수와 예상 크레딧을 본다(1장 약 11).
+3. `tools/make_portraits.py` 를 실행한다. 기본 표정을 먼저 만들고, 나머지 표정은 그 그림을 참고로 표정만 바꾼다.
+4. 흰 배경을 지운 결과가 `assets/portraits/` 에 들어간다. 모델 원본 출력은 `assets/raw/` 에 남는다.
+
 투명 여백은 자동으로 잘라 낸다. 전신 그림이면 상반신만 쓴다. 범위를 직접 정하려면 `data/case1.js`의 인물에 `crop: [x, y, 폭, 높이]`(그림 크기 대비 0~1 비율)를 넣는다.
 
 | 인물 id | 쓰는 표정 |
