@@ -29,7 +29,7 @@ CREDITS_PER_IMAGE = 11               # gpt-image-2.5-sunburst 실측(2026-10-04)
 
 # 시나리오(data/case1.js)에서 쓰는 표정만
 FACES = {
-    "nayuta": ["normal", "sad", "smile"],
+    "nayuta": ["normal", "sad", "smile", "open"],  # 평상시엔 눈을 감고 있음. open = 눈을 뜬 얼굴(하늘색 눈동자, 별 모양 빛) — 결정적 장면용
     "anis": ["normal", "smile", "shock"],
     "anis_star": ["normal", "smile", "shock"],  # 아니스: 스타(팝스타 의상), 아직 시나리오에 등장 전
     "hongryeon": ["normal", "drunk", "shock"],
@@ -39,6 +39,7 @@ FACES = {
     "me_new": ["normal", "confident", "shock"],  # 404 덩기덕 신의상(이격)
     "johan": ["normal", "stern", "shock"],  # 1심 증인(검찰 측), 인간 사이보그 지휘관
     "cecil": ["normal", "smile", "shock"],  # 1심 증인(기술 감정), 인간 기술자
+    "snowwhite": ["normal", "smile", "shock"],  # 1심 2일차 증인(결전 목격), 파이오니아 사격수
 }
 FACE_DESC = {
     "normal": "calm, neutral expression",
@@ -48,6 +49,7 @@ FACE_DESC = {
     "drunk": "tipsy expression, flushed red cheeks, half-closed eyes, relaxed grin",
     "stern": "stern, serious expression, narrowed eyes, closed mouth",
     "confident": "confident smirk, determined sharp eyes, slight smile",
+    "open": "eyes opened, bright glowing light sky-blue irises with a white star-shaped highlight, serious determined look",
 }
 STYLE = ("16-bit retro game pixel art, clearly visible chunky square pixels, limited palette of about 32 colors, "
          "clean dark 1-pixel outline, no anti-aliasing, no dithering noise. "
@@ -132,8 +134,12 @@ def main():
     chars = a.chars or list(FACES)
 
     if a.clean_only:
-        for p in sorted(RAW.glob("*.png")):
-            remove_background(p, OUT / p.name)
+        # raw/ 에는 배경·아이콘 원본도 있으므로 인물 초상(<인물>_<표정>.png)만 고른다
+        for cid in chars:
+            for face in FACES[cid]:
+                p = RAW / f"{cid}_{face}.png"
+                if p.exists():
+                    remove_background(p, OUT / p.name)
         return 0
 
     todo, missing = [], []

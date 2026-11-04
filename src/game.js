@@ -1034,8 +1034,10 @@
     const head = ov.purpose === 'view' ? '증거 목록' : '어떤 증거를 낼까?';
     text(head, 20, 15, COL.gold, { bold: true });
     if (ov.sel >= S.ev.length) ov.sel = 0;
-    S.ev.forEach((id, i) => {
-      const y = 32 + i * 18, on = i === ov.sel;
+    // 증거가 많으면 6개씩 나눠 보여 주고 ▲▼로 넘긴다(고른 증거가 있는 쪽을 보여 줌)
+    const PER = 6, pages = Math.max(1, Math.ceil(S.ev.length / PER)), first = Math.floor(ov.sel / PER) * PER;
+    S.ev.slice(first, first + PER).forEach((id, k) => {
+      const i = first + k, y = 32 + k * 18, on = i === ov.sel;
       const hot = pointer.x >= 18 && pointer.x < 118 && pointer.y >= y && pointer.y < y + 16;
       rect(18, y, 100, 16, on ? COL.gold : hot ? '#2c2a44' : '#1a1830');
       // 긴 이름은 칸 폭에서 자르고 끝에 …를 붙인다(전체 이름은 오른쪽 설명에 나옴)
@@ -1044,6 +1046,11 @@
       if (!full) text('…', 108, y + 1, on ? COL.ink : COL.text);
       B.push({ x: 18, y, w: 100, h: 16, fn: () => { ov.sel = i; ov.page = 0; SFX.select(); } });
     });
+    if (pages > 1) {
+      const pg = first / PER, go = (d) => { ov.sel = ((pg + d + pages) % pages) * PER; ov.page = 0; SFX.select(); };
+      button(18, 144, 48, 18, `▲ ${pg + 1}/${pages}`, () => go(-1));
+      button(70, 144, 48, 18, '▼', () => go(1));
+    }
     const id = S.ev[ov.sel];
     if (id) {
       const ev = CASE.evidence[id];

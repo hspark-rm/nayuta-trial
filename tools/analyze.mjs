@@ -15,6 +15,14 @@ const evName = (id) => (C.evidence[id] ? C.evidence[id].name : id);
 const who = (id) => (id ? (C.chars[id] ? C.chars[id].name : id) : '해설');
 const isLine = (op) => op.who !== undefined && !op.op;
 const len = (s) => [...s].length;
+// 조사 명령 안의 대사 목록(들어갈 때·살펴보기·이야기·마칠 때). again(두 번째 대사)은 세지 않는다
+const invLists = (op) => {
+  const ls = [];
+  for (const pl of Object.values(op.places)) { ls.push(pl.enter || []); (pl.spots || []).forEach((x) => ls.push(x.lines || [])); (pl.talk || []).forEach((x) => ls.push(x.lines || [])); }
+  ls.push((op.done && op.done.lines) || []);
+  return ls;
+};
+const invGives = (op) => invLists(op).flat().filter((x) => x.op === 'give').map((x) => x.id);
 
 // ───────── 구간 나누기: chapter / testimony / demand / end 를 기준으로 ─────────
 const labels = new Map(script.map((op, i) => [op, i]).filter(([op]) => op.op === 'label').map(([op, i]) => [op.id, i]));
@@ -59,6 +67,7 @@ for (const op of script) {
     node(oks.join(' 또는 '), 'diamond');
   }
   if (op.op === 'demand') { node(`증거 요구 (${who(op.who)})`); node(`「${evName(op.answer)}」 제시`, 'diamond'); }
+  if (op.op === 'investigate') { node(`조사: ${Object.values(op.places).map((pl) => pl.name).join(' · ')}`); node(`필요 증거 ${op.done.needs.map((e) => `「${evName(e)}」`).join(' ')}`, 'diamond'); }
   if (op.op === 'end') node(`${op.title}`, 'round');
 }
 P('```');
@@ -88,13 +97,25 @@ for (const op of script) {
     P(); P(`#### 증거 요구 — ${who(op.who)}: "${op.line}"`); P(); P(`정답: **「${evName(op.answer)}」**`); P();
     if (op.hints) { P('오답 힌트:'); op.hints.forEach((h, i) => P(`${i + 1}. ${h}`)); P(); }
   }
+  if (op.op === 'investigate') {
+    P(); P(`#### 조사 (${op.id}) — 마치려면 ${op.done.needs.map((e) => `「${evName(e)}」`).join(', ')}`); P();
+    P('| 장소 | 이야기 상대 | 살펴볼 곳 | 이야기 주제 | 찾는 증거 |');
+    P('|---|---|---|---|---|');
+    for (const pl of Object.values(op.places)) {
+      const found = [...(pl.spots || []).map((x) => [x.name, x.lines]), ...(pl.talk || []).map((x) => [x.topic, x.lines])]
+        .flatMap(([nm, ls]) => (ls || []).filter((o) => o.op === 'give').map((o) => `「${evName(o.id)}」(${nm})`)).join(', ');
+      P(`| ${pl.name} | ${pl.who ? who(pl.who) : '—'} | ${(pl.spots || []).length}곳 | ${(pl.talk || []).length}개 | ${found} |`);
+    }
+    P();
+  }
   if (op.op === 'end') { P(`### 끝: ${op.title}`); P(); P(op.text || ''); P(); }
 }
 
 // ───────── ② 분량 · 플레이 시간 ─────────
-let lines = 0, chars = 0, pressLines = 0, pressChars = 0, wrongLines = 0;
+let lines = 0, chars = 0, pressLines = 0, pressChars = 0, wrongLines = 0, invLines = 0, invChars = 0;
 for (const op of script) {
   if (isLine(op)) { lines++; chars += len(op.line); }
+  if (op.op === 'investigate') invLists(op).flat().filter(isLine).forEach((x) => { invLines++; invChars += len(x.line); });
   if (op.op === 'testimony') {
     op.statements.forEach((s) => { lines++; chars += len(s.line); (s.press || []).filter(isLine).forEach((x) => { pressLines++; pressChars += len(x.line); }); });
     wrongLines += (op.wrong || []).length;
@@ -108,16 +129,21 @@ P();
 P(`| 항목 | 값 |`);
 P(`|---|---|`);
 P(`| 대사(본편 + 증언 첫 낭독) | ${lines}줄, ${chars.toLocaleString()}자 |`);
+P(`| 조사 대사 전부(살펴보기·이야기 모두) | ${invLines}줄, ${invChars.toLocaleString()}자 |`);
 P(`| 캐묻기 대사 전부 | ${pressLines}줄, ${pressChars.toLocaleString()}자 |`);
-P(`| 증거품 | ${Object.keys(C.evidence).length}개 (캐묻기로 얻는 것 ${Object.keys(C.evidence).length - script.filter((o) => o.op === 'give').length}개 포함) |`);
+{
+  const pocket = script.filter((o) => o.op === 'give').map((o) => o.id);
+  const inv = script.filter((o) => o.op === 'investigate').flatMap(invGives);
+  P(`| 증거품 | ${Object.keys(C.evidence).length}개 (주머니 ${pocket.length} · 조사 ${new Set(inv).size} · 나머지는 캐묻기) |`);
+}
 P();
-P('추정 플레이 시간(읽기 초당 12자, 줄마다 0.6초 가정 · 실수 없음):');
+P('추정 플레이 시간(읽기 초당 12자, 줄마다 0.6초 가정 · 실수 없음 · 조사는 모든 곳을 다 보는 경우):');
 P();
 P('| 배속 | 글자 찍기만 | 캐묻기 안 함 | 캐묻기 전부 |');
 P('|---|---|---|---|');
 for (const sp of [1, 2, 4]) {
   const typeOnly = (chars + pressChars) / (CPS * sp);
-  P(`| ${sp}배 | ${mmss(typeOnly)} | ${mmss(est(chars, lines, sp))} | ${mmss(est(chars + pressChars, lines + pressLines, sp))} |`);
+  P(`| ${sp}배 | ${mmss(typeOnly + invChars / (CPS * sp))} | ${mmss(est(chars + invChars, lines + invLines, sp))} | ${mmss(est(chars + invChars + pressChars, lines + invLines + pressLines, sp))} |`);
 }
 P();
 P('배속은 글자 찍기만 빨라지므로, 읽는 속도가 느린 사람에게는 2배와 4배 차이가 작다.');
@@ -127,8 +153,10 @@ P();
 // 구간: 신문(testimony) / 증거 요구(demand). 저장 지점은 각 구간 앞에 있다(패소하면 그 구간을 하트 5개로 다시).
 const stages = [];
 const startEv = new Set(C.startEvidence || []);
+let pre = [];
 for (const op of script) {
-  if (op.op === 'give' && !stages.length) startEv.add(op.id);
+  if (op.op === 'give') pre.push(op.id);
+  if (op.op === 'investigate') pre.push(...invGives(op));
   if (op.op === 'testimony') {
     const correct = new Set(op.statements.flatMap((s, i) => Object.keys(s.present || {}).map((e) => `${i}|${e}`)));
     const k = op.statements.findIndex((s) => s.present);
@@ -139,9 +167,11 @@ for (const op of script) {
       gives: op.statements.map((s) => (s.press || []).filter((x) => x.op === 'give').map((x) => x.id)),
       hints: (op.hints || []).length,
       texts: op.statements.map((s) => s.line),
+      pre,
     });
+    pre = [];
   }
-  if (op.op === 'demand') stages.push({ kind: 'demand', title: '증거 요구', ansEv: [op.answer], hints: (op.hints || []).length, texts: [op.line] });
+  if (op.op === 'demand') { stages.push({ kind: 'demand', title: '증거 요구', ansEv: [op.answer], hints: (op.hints || []).length, texts: [op.line], pre }); pre = []; }
 }
 let seed = 20261104;
 const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
@@ -163,6 +193,7 @@ function play(type) {
   const ev = new Set(startEv);
   let wrongTotal = 0, overs = 0;
   for (const st of stages) {
+    st.pre.forEach((x) => ev.add(x));
     const tried = new Set(), pressed = new Set();
     let wrongHere = 0, hearts = 5;
     if (type === 'thorough' && st.kind === 'testimony') st.gives.forEach((g, i) => { pressed.add(i); g.forEach((x) => ev.add(x)); });
@@ -223,6 +254,7 @@ P();
 {
   const ev = new Set(startEv);
   for (const st of stages) {
+    st.pre.forEach((x) => ev.add(x));
     if (st.kind === 'testimony') {
       const before = ev.size, had = st.ansEv.some((x) => ev.has(x)); st.gives.flat().forEach((x) => ev.add(x));
       P(`- ${st.title}: ${st.n}문장 × 증거 ${before}~${ev.size}개 = 정답 ${st.correct.size}쌍 / ${st.n * before}~${st.n * ev.size}쌍${had ? '' : ' (정답 증거를 캐묻기로 먼저 얻어야 함)'}`);

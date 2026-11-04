@@ -33,6 +33,10 @@ ICONS = {
     "e5": "one large glowing green bullet cartridge standing inside a small glass case",
     "e6": "an opened ancient stone coffin seen at an angle, empty inside",
     "e7": "a small pile of several glowing hexagonal mechanical cores lying on a cloth, carefully set aside",
+    "e0": "a folded official legal document with a red seal stamp and a small gavel emblem",
+    "e8": "a metal clipboard holding a checklist sheet, with a small wrench clipped to it",
+    "e9": "three deep giant claw scratch marks gouged into a patch of brown earth, seen from above",
+    "e10": "a small rugged tablet screen showing a green targeting reticle and a cannon launch graph",
 }
 
 
