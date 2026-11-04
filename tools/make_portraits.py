@@ -105,6 +105,8 @@ def remove_background(src, dest, tol=28):
     box = out.getbbox()
     if box:
         out = out.crop(box)
+    # 게임은 120×112로 줄여 쓰므로 360픽셀이면 충분하다(웹 배포·휴대폰 로딩용)
+    out.thumbnail((360, 360), Image.LANCZOS)
     dest.parent.mkdir(parents=True, exist_ok=True)
     out.save(dest)
     print(f"  저장: {dest.relative_to(ROOT)} ({out.width}×{out.height}, 배경 {bg.mean():.0%} 제거)")

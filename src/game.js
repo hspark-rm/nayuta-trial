@@ -686,24 +686,26 @@
     text(S.testTitle.title, 160, 82, COL.text, { align: 'center', bold: true, scale: 1 });
   }
   const CREDIT = '비공식 팬 제작 · 원작: 승리의 여신: 니케 / SHIFT UP';
+  const NOTICE = '비영리 팬 프로젝트 · 문제 시 즉시 삭제합니다';
   function drawTitle() {
     rect(0, 0, W, H, COL.night);
     for (let i = 0; i < 40; i++) {
       const x = (i * 73) % W, y = (i * 41 + Math.floor(S.t * 6 * ((i % 3) + 1))) % 120;
       rect(x, y, 1, 1, i % 4 ? '#3a3858' : '#6a68a0');
     }
-    text('나유타 재판', 160, 34, COL.gold, { align: 'center', bold: true, scale: 3, outline: COL.ink });
-    text(CASE.subtitle || '', 160, 82, COL.dim, { align: 'center' });
-    button(110, 96, 100, 18, '새로 시작', () => begin(null));
-    button(110, 117, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
+    text('나유타 재판', 160, 22, COL.gold, { align: 'center', bold: true, scale: 3, outline: COL.ink });
+    text(CASE.subtitle || '', 160, 70, COL.dim, { align: 'center' });
+    button(110, 88, 100, 18, '새로 시작', () => begin(null));
+    button(110, 109, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
     const sound = muted ? '소리 꺼짐' : '소리 켜짐';
     const hasSkins = Object.keys(CASE.variants || {}).length > 0;
     const row = [[sound, toggleMute]];
     if (hasSkins) row.push(['의상', () => { S.scene = 'skins'; }]);
     if (canFull && !isFull()) row.push(['전체 화면', goFull]);
     const bw = 64, gap = 10, x0 = Math.round(160 - (row.length * bw + (row.length - 1) * gap) / 2);
-    row.forEach(([label, fn], i) => button(x0 + i * (bw + gap), 138, bw, 18, label, fn));
-    text(CREDIT, 160, 164, COL.dim, { align: 'center' });
+    row.forEach(([label, fn], i) => button(x0 + i * (bw + gap), 130, bw, 18, label, fn));
+    text(CREDIT, 160, 152, COL.dim, { align: 'center' });
+    text(NOTICE, 160, 165, '#6a6890', { align: 'center' });
     text('v0.1', 316, 2, '#4a4870', { align: 'right' });
     if (dataErrors.length) text(`데이터 오류 ${dataErrors.length}건 (콘솔 확인)`, 4, 2, COL.red);
   }

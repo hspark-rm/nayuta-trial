@@ -1,5 +1,3 @@
-# 원본 게임 그림은 저장소에 넣지 않는다 (비공개 임시 사용)
-assets/**/*.png
-assets/**/*.jpg
-assets/**/*.webp
+# 모델 원본 출력(고해상도)은 올리지 않는다. 게임에는 assets/portraits 의 축소본만 쓴다
+assets/raw/
 .DS_Store
