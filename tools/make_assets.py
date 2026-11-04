@@ -18,6 +18,7 @@ STYLE = ("16-bit retro game pixel art, clearly visible chunky square pixels, lim
 
 # 참고: 지금 게임 배경(assets/bg/court.png)은 assets/raw/bg_mass_2.png(밝은 캐주얼 + 양산형 니케·눈 가린 NPC 관중)를 골라 넣은 것이다.
 # 아래 BG는 처음 만든 어두운 배경의 지시문이다. 다시 돌리면 어두운 배경으로 덮어쓰니 주의.
+# 휴정 대기실(assets/bg/lobby.png)은 assets/raw/bg_lobby_2.png 를 128색으로 줄인 것이다(법정 배경 bg_mass_2를 화풍 참고로 생성).
 BG = ("Wide pixel art background of a futuristic underground-city courtroom interior, seen from the front. "
       "A high judge's bench in the back center under a large round emblem. "
       "On the left, a jury box with six ordinary civilians of a sci-fi underground city (casual jackets, hoodies, work uniforms). "

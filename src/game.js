@@ -745,7 +745,10 @@
     }
   }
   // 휴정 장면: 법정 옆 작은 방. 자판기, 벤치, 창, 쌓인 상자(세실 말로는 창고)
+  // 그림(assets/bg/lobby.png)이 있으면 그것을 쓰고, 없으면 아래 도형으로 그린다
   function drawLobby() {
+    const im = asset('bg:lobby', 'assets/bg/lobby.png', (i) => coverFrom(i, W, H));
+    if (im) { g.drawImage(im, 0, 0, W, H); return; }
     rect(0, 0, W, H, '#d9c7a4');
     for (let x = 0; x < W; x += 24) rect(x, 0, 12, 112, '#d2bd96');
     rect(0, 104, W, 8, '#a8845a'); rect(0, 104, W, 2, '#c49d6c');
