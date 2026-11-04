@@ -272,8 +272,16 @@
     mode: 'idle', // line | cross | chapter | testTitle | stamp | idle
     line: null, portrait: null, test: null, overlay: null, demand: null,
     chapter: null, testTitle: null, end: null, hinted: false,
+    bg: 'court', pocket: null, pockets: 0, // pocket = 주머니에서 막 나온 증거품 카드
     fx: { shake: 0, flash: 0, stamp: null }, t: 0,
   };
+  // 증거품을 받을 때 변호인이 하는 말(차례로 돌아가며 씀). 명령에 line이 있으면 그것을 쓴다
+  const POCKET_LINES = [
+    '(…증거품? 이게 왜 내 주머니에 있지?)',
+    '(또 주머니에서 뭔가 나왔다. 이 세계의 주머니는 대체 어떻게 된 거야?)',
+    '(넣은 기억이 없는데… 주머니가 알아서 증거를 모으나?)',
+    '(주머니가 묵직하다. …설마 또?)',
+  ];
   try { S.saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { S.saved = null; }
 
   // ───────── 진행기: 명령을 차례로 실행하다가 입력을 기다리는 명령에서 멈춘다 ─────────
@@ -313,9 +321,14 @@
         if (S.ev.includes(op.id)) return false; // 같은 캐묻기를 다시 해도 한 번만 받는다
         S.ev.push(op.id);
         SFX.give();
-        startLine({ who: null, line: `${josa(`「${CASE.evidence[op.id].name}」`, '을', '를')} 증거 목록에 넣었다.`, color: COL.gold });
+        // 증거품이 변호인 주머니에서 '저절로' 나오는 연출: 카드를 띄우고 변호인이 놀란다
+        S.pocket = { id: op.id, t: 0 };
+        const got = { who: null, color: COL.gold, line: `${josa(`「${CASE.evidence[op.id].name}」`, '을', '를')} 증거 목록에 넣었다.` };
+        const react = op.line === false ? [] : [{ who: 'me', face: op.face || 'shock', line: op.line || POCKET_LINES[S.pockets++ % POCKET_LINES.length] }];
+        sub([...react, got], () => { S.pocket = null; step(); });
         return true;
       }
+      case 'bg': S.bg = op.id; return false;
       case 'save': save(); return false;
       case 'chapter': S.portrait = null; S.chapter = op; S.mode = 'chapter'; return true;
       case 'testimony': startTestimony(op); return true;
@@ -385,22 +398,31 @@
     S.mode = 'idle';
     sub(press, enterCross);
   }
-  function wrong(lines, then) {
+  // 틀릴 때마다 변호인이 속으로 힌트를 말한다. 같은 증언에서 여러 번 틀리면 더 분명한 힌트로 넘어간다
+  const wrongCount = new WeakMap();
+  function hintFor(op) {
+    const hs = op && op.hints;
+    if (!hs || !hs.length) return [];
+    const n = wrongCount.get(op) || 0;
+    wrongCount.set(op, n + 1);
+    return [{ who: 'me', line: hs[Math.min(n, hs.length - 1)] }];
+  }
+  function wrong(lines, then, op) {
     S.patience = Math.max(0, S.patience - 1);
     S.fx.shake = 0.4; SFX.wrong();
     const ls = lines && lines.length ? lines : [{ who: 'judge', line: '그 증거로는 아무것도 증명되지 않습니다.' }];
     S.overlay = null; S.mode = 'idle';
-    sub(ls, () => { if (S.patience <= 0) gameOver(); else then(); });
+    sub(S.patience > 0 ? [...ls, ...hintFor(op)] : ls, () => { if (S.patience <= 0) gameOver(); else then(); });
   }
   function present(id) {
     const ov = S.overlay;
     if (ov.purpose === 'cross') {
       const st = S.test.op.statements[S.test.idx];
       const to = st.present && st.present[id];
-      if (to) { S.overlay = null; jumpTo(to); SFX.ok(); step(); } else wrong(S.test.op.wrong, enterCross);
+      if (to) { S.overlay = null; jumpTo(to); SFX.ok(); step(); } else wrong(S.test.op.wrong, enterCross, S.test.op);
     } else if (ov.purpose === 'demand') {
       const d = S.demand;
-      if (id === d.answer) { S.overlay = null; jumpTo(d.ok); SFX.ok(); step(); } else wrong(d.wrong, () => openOverlay('demand'));
+      if (id === d.answer) { S.overlay = null; jumpTo(d.ok); SFX.ok(); step(); } else wrong(d.wrong, () => openOverlay('demand'), d);
     }
   }
 
@@ -418,7 +440,7 @@
   }
 
   // ───────── 저장 1칸 ─────────
-  function snapshot() { return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted }; }
+  function snapshot() { return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted, bg: S.bg, pockets: S.pockets }; }
   function save() {
     S.saved = snapshot();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.saved)); } catch (e) { /* 저장소를 못 쓰면 이번 판에서만 기억 */ }
@@ -433,6 +455,9 @@
     S.ev = from ? [...from.ev] : [...(CASE.startEvidence || [])];
     S.patience = from ? Math.max(from.patience, 1) : MAX_PATIENCE;
     S.hinted = from ? !!from.hinted : false;
+    S.bg = (from && from.bg) || 'court';
+    S.pockets = (from && from.pockets) || 0;
+    S.pocket = null;
     S.line = null; S.portrait = null; S.test = null; S.overlay = null; S.demand = null;
     S.mode = 'idle';
     step();
@@ -486,8 +511,8 @@
     const ov = S.overlay;
     if (ov) {
       const n = S.ev.length;
-      if (k === 'ArrowUp' || k === 'ArrowLeft') { ov.sel = (ov.sel - 1 + n) % n; SFX.select(); }
-      else if (k === 'ArrowDown' || k === 'ArrowRight') { ov.sel = (ov.sel + 1) % n; SFX.select(); }
+      if (k === 'ArrowUp' || k === 'ArrowLeft') { ov.sel = (ov.sel - 1 + n) % n; ov.page = 0; SFX.select(); }
+      else if (k === 'ArrowDown' || k === 'ArrowRight') { ov.sel = (ov.sel + 1) % n; ov.page = 0; SFX.select(); }
       else if ((k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') && ov.purpose !== 'view') present(S.ev[ov.sel]);
       else if (k === 'Escape' || k === 'e' || k === 'E' || k === 'x' || k === 'X') closeOverlay();
       e.preventDefault();
@@ -517,6 +542,7 @@
     const fx = S.fx;
     fx.shake = Math.max(0, fx.shake - dt);
     fx.flash = Math.max(0, fx.flash - dt * 2.5);
+    if (S.pocket) S.pocket.t += dt;
     if (S.mode === 'stamp' && fx.stamp) { fx.stamp.t -= dt; if (fx.stamp.t <= 0) confirm(); }
     if (S.mode === 'testTitle' && S.testTitle) { S.testTitle.t -= dt; if (S.testTitle.t <= 0) confirm(); }
     const l = S.line;
@@ -535,7 +561,19 @@
   function frameBox(x, y, w, h) {
     rect(x, y, w, h, COL.gold); rect(x + 1, y + 1, w - 2, h - 2, COL.ink); rect(x + 2, y + 2, w - 4, h - 4, COL.box);
   }
+  // 프롤로그용: 눈을 뜬 2D 세계. 도트 격자와 떠다니는 조각
+  function drawVoid() {
+    rect(0, 0, W, H, '#0b0a1a');
+    for (let x = 0; x < W; x += 16) rect(x, 0, 1, H, '#15143a');
+    for (let y = 0; y < H; y += 16) rect(0, y, W, 1, '#15143a');
+    for (let i = 0; i < 24; i++) {
+      const x = (i * 53) % W, y = Math.round((i * 37 + S.t * (6 + (i % 4) * 3)) % (H + 20)) - 10;
+      rect(x, H - y, 4 + (i % 3) * 2, 4 + (i % 3) * 2, i % 5 ? '#2a2f6a' : '#c4e0f4');
+    }
+    text('404 NOT FOUND', 160, 40, '#1f2050', { align: 'center', bold: true, scale: 2.5 });
+  }
   function drawCourt() {
+    if (S.bg === 'void') { drawVoid(); return; }
     const bg = asset('bg:court', 'assets/bg/court.png', (im) => coverFrom(im, W, H));
     if (bg) { g.drawImage(bg, 0, 0, W, H); return; }
     rect(0, 0, W, H, COL.wall);
@@ -612,12 +650,23 @@
     button(212, 84, 74, 18, keyHint('증거 내기', 'E'), () => openOverlay('cross'));
     button(290, 84, 26, 18, '▶', () => crossMove(1));
   }
-  function evIcon(id, x, y) {
+  function evIcon(id, x, y, k = 1) {
     const c = asset(`e:${id}`, `assets/evidence/${id}.png`, (im) => containFrom(im, 32, 32));
-    if (c) { const iw = c.width / RES, ih = c.height / RES; g.drawImage(c, x + (32 - iw) / 2, y + (32 - ih) / 2, iw, ih); return; }
+    if (c) { const iw = (c.width / RES) * k, ih = (c.height / RES) * k; g.drawImage(c, x + (32 * k - iw) / 2, y + (32 * k - ih) / 2, iw, ih); return; }
     const ev = CASE.evidence[id];
-    rect(x + 4, y + 2, 24, 28, '#d8d0b8'); rect(x + 4, y + 2, 24, 4, ev.color || COL.gold);
-    for (let i = 0; i < 4; i++) rect(x + 8, y + 10 + i * 5, 16 - (i % 2) * 5, 2, '#8a8070');
+    rect(x + 4 * k, y + 2 * k, 24 * k, 28 * k, '#d8d0b8'); rect(x + 4 * k, y + 2 * k, 24 * k, 4 * k, ev.color || COL.gold);
+    for (let i = 0; i < 4; i++) rect(x + 8 * k, y + (10 + i * 5) * k, (16 - (i % 2) * 5) * k, 2 * k, '#8a8070');
+  }
+  // 주머니에서 나온 증거품 카드: 아래에서 튀어 오른 뒤 살짝 떠 있다
+  function drawPocket() {
+    const p = S.pocket, ev = CASE.evidence[p.id];
+    const rise = Math.max(0, 1 - p.t * 5), bob = Math.round(Math.sin(S.t * 4) * 1);
+    // 변호인 얼굴을 가리지 않게 오른쪽에 띄운다
+    const x = 210, y = 20 + Math.round(rise * 60) + bob, w = 104, h = 84;
+    frameBox(x, y, w, h);
+    text('주머니 속 증거품', x + w / 2, y + 4, COL.dim, { align: 'center', scale: 10 / 12 });
+    evIcon(p.id, x + w / 2 - 24, y + 17, 1.5);
+    wrap(ev.name, w - 10, true).slice(0, 2).forEach((s, i) => text(s, x + w / 2, y + 64 + i * 10, COL.gold, { align: 'center', bold: true, scale: 10 / 12 }));
   }
   function drawOverlay() {
     const ov = S.overlay;
@@ -634,7 +683,7 @@
       const nm = CASE.evidence[id].name, full = tw(nm) <= 92;
       text(nm, 22, y + 1, on ? COL.ink : COL.text, { clip: full ? null : 86 });
       if (!full) text('…', 108, y + 1, on ? COL.ink : COL.text);
-      B.push({ x: 18, y, w: 100, h: 16, fn: () => { ov.sel = i; SFX.select(); } });
+      B.push({ x: 18, y, w: 100, h: 16, fn: () => { ov.sel = i; ov.page = 0; SFX.select(); } });
     });
     const id = S.ev[ov.sel];
     if (id) {
@@ -642,7 +691,12 @@
       rect(124, 30, 178, 1, COL.trim);
       evIcon(id, 126, 36);
       wrap(ev.name, 136, true).slice(0, 2).forEach((s, i) => text(s, 164, 36 + i * 14, COL.gold, { bold: true }));
-      wrap(ev.desc, 170).slice(0, 5).forEach((s, i) => text(s, 128, 74 + i * 14, COL.text));
+      // 설명은 10px로 쓰고, 6줄이 넘으면 '설명 1/2' 버튼으로 넘겨 본다
+      const DS = 10 / 12, per = 6;
+      const desc = wrap(ev.desc, 170 / DS), pages = Math.ceil(desc.length / per);
+      if (!(ov.page < pages)) ov.page = 0;
+      desc.slice(ov.page * per, ov.page * per + per).forEach((s, i) => text(s, 128, 72 + i * 12, COL.text, { scale: DS }));
+      if (pages > 1) button(128, 148, 60, 18, `설명 ${ov.page + 1}/${pages}`, () => { ov.page = (ov.page + 1) % pages; SFX.select(); });
     }
     if (ov.purpose !== 'view') button(192, 148, 54, 18, keyHint('제시', 'Z'), () => present(S.ev[ov.sel]));
     if (ov.purpose !== 'demand') button(250, 148, 52, 18, '닫기', closeOverlay);
@@ -746,12 +800,13 @@
     else {
       const sh = S.fx.shake > 0 ? 2 : 0;
       g.setTransform(RES, 0, 0, RES, sh ? Math.round(Math.random() * 4 - 2) * RES : 0, sh ? Math.round(Math.random() * 4 - 2) * RES : 0);
-      drawCourt(); drawPortrait(); drawStand();
+      drawCourt(); drawPortrait(); if (S.bg !== 'void') drawStand();
       g.setTransform(RES, 0, 0, RES, 0, 0);
       drawHud();
       if (S.mode === 'line' && S.line) drawLine();
       else if (S.mode === 'cross') drawCross();
       else frameBox(4, 118, 312, 58);
+      if (S.pocket) drawPocket();
       // 위에 덮는 화면이 뜨면 아래 버튼은 눌리지 않게 비운다
       if (S.mode === 'testTitle' && S.testTitle) { B = []; drawTestTitle(); }
       if (S.overlay) { B = []; drawOverlay(); }
