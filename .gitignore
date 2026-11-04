@@ -1,0 +1,5 @@
+# 원본 게임 그림은 저장소에 넣지 않는다 (비공개 임시 사용)
+assets/**/*.png
+assets/**/*.jpg
+assets/**/*.webp
+.DS_Store

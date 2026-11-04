@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>나유타 재판</title>
+<style>
+  /* 갈무리11: 도트 한글 글꼴, SIL OFL 1.1 (github.com/quiple/galmuri) */
+  @font-face { font-family: Galmuri11; src: url(https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/Galmuri11.woff2) format("woff2"); }
+  @font-face { font-family: Galmuri11Bold; src: url(https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/Galmuri11-Bold.woff2) format("woff2"); }
+  html, body { margin: 0; height: 100%; background: #07060c; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+</style>
+</head>
+<body>
+<canvas id="game" width="320" height="180"></canvas>
+<script src="data/case1.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
