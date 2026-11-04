@@ -33,7 +33,12 @@ FACES = {
     "anis": ["normal", "smile", "shock"],
     "anis_star": ["normal", "smile", "shock"],  # 아니스: 스타(팝스타 의상), 아직 시나리오에 등장 전
     "hongryeon": ["normal", "drunk", "shock"],
-    "judge": ["normal", "stern"],  # 재판장 = 니케 노벨
+    "judge": ["normal", "stern"],  # 재판장 = 에닉(방주 관리 AI)
+    "prosecutor": ["normal", "stern"],  # 검사 = 니케 노벨
+    "me": ["normal", "confident", "shock"],  # 변호사(플레이어) = 404 덩기덕, 원래 의상
+    "me_new": ["normal", "confident", "shock"],  # 404 덩기덕 신의상(이격)
+    "johan": ["normal", "stern", "shock"],  # 1심 증인(검찰 측), 인간 사이보그 지휘관
+    "cecil": ["normal", "smile", "shock"],  # 1심 증인(기술 감정), 인간 기술자
 }
 FACE_DESC = {
     "normal": "calm, neutral expression",
@@ -42,6 +47,7 @@ FACE_DESC = {
     "shock": "shocked expression, wide eyes, mouth open, a small sweat drop",
     "drunk": "tipsy expression, flushed red cheeks, half-closed eyes, relaxed grin",
     "stern": "stern, serious expression, narrowed eyes, closed mouth",
+    "confident": "confident smirk, determined sharp eyes, slight smile",
 }
 STYLE = ("16-bit retro game pixel art, clearly visible chunky square pixels, limited palette of about 32 colors, "
          "clean dark 1-pixel outline, no anti-aliasing, no dithering noise. "
@@ -87,8 +93,9 @@ def remove_background(src, dest, tol=28):
     near_white = (255 - rgb).max(axis=2) <= tol
     bg = np.zeros((h, w), bool)
     q = deque()
+    # 상반신 그림은 아래가 옷에서 잘리므로 아래 테두리에서는 시작하지 않는다(흰 옷이 지워지는 것 방지)
     for x in range(w):
-        for y in (0, h - 1):
+        for y in (0,):
             if near_white[y, x] and not bg[y, x]:
                 bg[y, x] = True; q.append((y, x))
     for y in range(h):
