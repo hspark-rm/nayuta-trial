@@ -5,8 +5,14 @@
   const W = 320, H = 180;
   const CASE = window.CASE;
   const cv = document.getElementById('game');
-  const g = cv.getContext('2d');
+  const out = cv.getContext('2d');
+  // 게임은 320×180 버퍼에 그리고, 매 프레임 화면 캔버스로 옮긴다
+  const buf = document.createElement('canvas');
+  buf.width = W; buf.height = H;
+  const g = buf.getContext('2d');
   g.imageSmoothingEnabled = false;
+  const TOUCH = matchMedia('(pointer: coarse)').matches;
+  const keyHint = (label, key) => (TOUCH ? label : `${label} ${key}`);
 
   const COL = {
     night: '#07060c', wall: '#2a2846', wall2: '#322f55', trim: '#4a4578',
@@ -17,15 +23,33 @@
   const SAVE_KEY = 'nayuta-trial.save.v1';
   const MAX_PATIENCE = 5;
 
-  // ───────── 화면 맞춤: 2배 이상이면 정수배, 그보다 작으면 비율만 맞춘다 ─────────
+  // ───────── 화면 맞춤 ─────────
+  // 버퍼를 정수배(n)로 키워 캔버스에 그리고, CSS로 화면 크기(k배)에 맞춘다.
+  // n ≥ k 라서 도트 크기가 고르게 유지되고 화면도 꽉 찬다.
   function fit() {
-    const k = Math.min(innerWidth / W, innerHeight / H);
-    const s = k >= 2 ? Math.floor(k) : k;
-    cv.style.width = Math.floor(W * s) + 'px';
-    cv.style.height = Math.floor(H * s) + 'px';
+    const vw = window.visualViewport ? visualViewport.width : innerWidth;
+    const vh = window.visualViewport ? visualViewport.height : innerHeight;
+    const k = Math.min(vw / W, vh / H);
+    const n = Math.max(1, Math.ceil(k * (window.devicePixelRatio || 1)));
+    if (cv.width !== W * n) { cv.width = W * n; cv.height = H * n; }
+    out.imageSmoothingEnabled = false;
+    cv.style.width = Math.floor(W * k) + 'px';
+    cv.style.height = Math.floor(H * k) + 'px';
   }
   addEventListener('resize', fit);
+  addEventListener('orientationchange', () => setTimeout(fit, 200));
+  if (window.visualViewport) visualViewport.addEventListener('resize', fit);
   fit();
+  const portraitHeld = () => innerHeight > innerWidth * 1.1;
+
+  // 안드로이드 크롬: 전체 화면에 들어가면 가로로 고정할 수 있다. 아이폰 사파리는 지원하지 않음.
+  const canFull = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  async function goFull() {
+    const el = document.documentElement;
+    try { await (el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen()); } catch (e) { return; }
+    try { await screen.orientation.lock('landscape'); } catch (e) { /* 고정을 못 하면 사용자가 돌린다 */ }
+  }
 
   // ───────── 글자: 안티에일리어싱을 걷어 내야 도트 글꼴처럼 보인다 ─────────
   const measure = document.createElement('canvas').getContext('2d');
@@ -432,9 +456,12 @@
   }
   cv.addEventListener('pointermove', (e) => { const p = toBase(e); pointer.x = p.x; pointer.y = p.y; });
   cv.addEventListener('pointerleave', () => { pointer.x = pointer.y = -1; });
+  // 손가락을 떼면 강조 표시를 지운다(마우스와 달리 위치가 남지 않게)
+  cv.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') pointer.x = pointer.y = -1; });
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     audio();
+    if (portraitHeld()) { if (canFull && !isFull()) goFull(); return; }
     const p = toBase(e); pointer.x = p.x; pointer.y = p.y;
     for (let i = B.length - 1; i >= 0; i--) {
       const b = B[i];
@@ -548,7 +575,7 @@
       HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? COL.red : '#3a3040'); }));
     }
     const can = S.mode === 'line' || S.mode === 'cross';
-    button(268, 4, 48, 14, '증거 E', () => openOverlay(S.mode === 'cross' ? 'cross' : 'view'), { off: !can || !!S.overlay });
+    button(266, 3, 50, 16, keyHint('증거', 'E'), () => openOverlay(S.mode === 'cross' ? 'cross' : 'view'), { off: !can || !!S.overlay });
   }
   function drawNameTag(name) {
     if (!name) return;
@@ -577,10 +604,11 @@
     drawNameTag(CASE.chars[t.op.witness].name);
     text(`증언 ${t.idx + 1}/${n}`, 308, 106, COL.testimony, { align: 'right', outline: COL.ink });
     wrap(st.line, LINE_W).slice(0, LINES).forEach((s, i) => text(s, 12, 124 + i * 14, COL.testimony, { shadow: COL.ink }));
-    button(6, 88, 22, 14, '◀', () => crossMove(-1));
-    button(32, 88, 58, 14, '캐묻기 X', crossPress);
-    button(214, 88, 74, 14, '증거 내기 E', () => openOverlay('cross'));
-    button(292, 88, 22, 14, '▶', () => crossMove(1));
+    // 손가락으로 누르기 쉽게 18픽셀 높이
+    button(4, 84, 26, 18, '◀', () => crossMove(-1));
+    button(34, 84, 58, 18, keyHint('캐묻기', 'X'), crossPress);
+    button(212, 84, 74, 18, keyHint('증거 내기', 'E'), () => openOverlay('cross'));
+    button(290, 84, 26, 18, '▶', () => crossMove(1));
   }
   function evIcon(id, x, y) {
     const c = asset(`e:${id}`, `assets/evidence/${id}.png`, (im) => containFrom(im, 32, 32));
@@ -614,8 +642,8 @@
       wrap(ev.name, 136, true).slice(0, 2).forEach((s, i) => text(s, 164, 36 + i * 14, COL.gold, { bold: true }));
       wrap(ev.desc, 170).slice(0, 5).forEach((s, i) => text(s, 128, 74 + i * 14, COL.text));
     }
-    if (ov.purpose !== 'view') button(196, 150, 52, 14, '제시 Z', () => present(S.ev[ov.sel]));
-    if (ov.purpose !== 'demand') button(252, 150, 50, 14, '닫기', closeOverlay);
+    if (ov.purpose !== 'view') button(192, 148, 54, 18, keyHint('제시', 'Z'), () => present(S.ev[ov.sel]));
+    if (ov.purpose !== 'demand') button(250, 148, 52, 18, '닫기', closeOverlay);
   }
   function drawStamp() {
     const st = S.fx.stamp;
@@ -646,9 +674,13 @@
     }
     text('나유타 재판', 160, 34, COL.gold, { align: 'center', bold: true, scale: 3, outline: COL.ink });
     text(CASE.subtitle || '', 160, 82, COL.dim, { align: 'center' });
-    button(110, 102, 100, 16, '새로 시작', () => begin(null));
-    button(110, 122, 100, 16, '이어하기', () => begin(S.saved), { off: !S.saved });
-    button(110, 142, 100, 14, muted ? '소리 꺼짐' : '소리 켜짐', toggleMute);
+    button(110, 96, 100, 18, '새로 시작', () => begin(null));
+    button(110, 117, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
+    const sound = muted ? '소리 꺼짐' : '소리 켜짐';
+    if (canFull && !isFull()) {
+      button(84, 138, 74, 18, sound, toggleMute);
+      button(162, 138, 74, 18, '전체 화면', goFull);
+    } else button(110, 138, 100, 18, sound, toggleMute);
     text(CREDIT, 160, 164, COL.dim, { align: 'center' });
     text('v0.1', 316, 2, '#4a4870', { align: 'right' });
     if (dataErrors.length) text(`데이터 오류 ${dataErrors.length}건 (콘솔 확인)`, 4, 2, COL.red);
@@ -657,20 +689,30 @@
     rect(0, 0, W, H, COL.night);
     text('패소', 160, 40, COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
     text('재판장의 인내심이 바닥났다.', 160, 86, COL.text, { align: 'center' });
-    button(90, 112, 140, 16, '마지막 저장 지점부터', retry);
-    button(90, 132, 140, 16, '타이틀로', toTitle);
+    button(90, 110, 140, 18, '마지막 저장 지점부터', retry);
+    button(90, 132, 140, 18, '타이틀로', toTitle);
   }
   function drawEnd() {
     rect(0, 0, W, H, COL.night);
     const e = S.end;
     text(e.title, 160, 40, e.result === 'win' ? COL.gold : COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
     wrap(e.text || '', 280).forEach((s, i) => text(s, 160, 90 + i * 14, COL.text, { align: 'center' }));
-    button(110, 140, 100, 16, '타이틀로', toTitle);
+    button(110, 140, 100, 18, '타이틀로', toTitle);
+  }
+  function drawRotate() {
+    rect(0, 0, W, H, COL.night);
+    // 휴대폰 모양을 눕히는 그림
+    rect(112, 40, 24, 40, COL.dim); rect(114, 43, 20, 32, COL.night);
+    rect(172, 56, 40, 24, COL.gold); rect(175, 58, 32, 20, COL.night);
+    text('→', 154, 54, COL.text, { align: 'center' });
+    text('휴대폰을 가로로 돌려 주세요', 160, 100, COL.text, { align: 'center', bold: true });
+    if (canFull) text('화면을 누르면 전체 화면으로 바뀝니다', 160, 120, COL.dim, { align: 'center' });
   }
   function draw() {
     B = [];
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (S.scene === 'title') drawTitle();
+    if (portraitHeld()) drawRotate();
+    else if (S.scene === 'title') drawTitle();
     else if (S.scene === 'over') drawOver();
     else if (S.scene === 'end') drawEnd();
     else if (S.mode === 'chapter') drawChapter();
@@ -689,6 +731,7 @@
       if (S.mode === 'stamp' && S.fx.stamp) { B = []; drawStamp(); }
     }
     if (S.fx.flash > 0) rect(0, 0, W, H, `rgba(255,255,255,${S.fx.flash.toFixed(2)})`);
+    out.drawImage(buf, 0, 0, cv.width, cv.height);
   }
 
   // ───────── 시작: 글꼴을 기다린 뒤(최대 3초) 돌린다 ─────────
