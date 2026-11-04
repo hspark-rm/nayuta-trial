@@ -10,6 +10,8 @@
 
 플레이: <https://hspark-rm.github.io/nayuta-trial/>
 
+제작: 유기농쵸비 · 피드백: globalchmist@naver.com
+
 ## 실행
 
 ```bash

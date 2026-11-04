@@ -885,7 +885,8 @@
   }
   const TITLE = '나유타 재판', TAGLINE = '이 길이 아닌가?';
   const CREDIT = '비공식 팬 제작 · 원작: 승리의 여신: 니케 / SHIFT UP';
-  const NOTICE = '비영리 팬 프로젝트 · 문제 시 즉시 삭제합니다';
+  const NOTICE = '제작 유기농쵸비 · 비영리 팬 프로젝트 · 문제 시 즉시 삭제합니다';
+  const FEEDBACK = '피드백: globalchmist@naver.com';
   function drawTitle() {
     rect(0, 0, W, H, COL.night);
     for (let i = 0; i < 40; i++) {
@@ -907,7 +908,7 @@
     const bw = 64, gap = 10, x0 = Math.round(160 - (row.length * bw + (row.length - 1) * gap) / 2);
     row.forEach(([label, fn], i) => button(x0 + i * (bw + gap), 130, bw, 18, label, fn));
     text(CREDIT, 160, 152, COL.dim, { align: 'center' });
-    text(NOTICE, 160, 165, '#6a6890', { align: 'center' });
+    text(NOTICE, 160, 166, '#6a6890', { align: 'center', scale: 10 / 12 });
     text('v0.1', 316, 2, '#4a4870', { align: 'right' });
     if (dataErrors.length) text(`데이터 오류 ${dataErrors.length}건 (콘솔 확인)`, 4, 2, COL.red);
   }
@@ -929,6 +930,7 @@
     text(`플레이 시간 ${Math.floor(st.sec / 60)}분 ${String(Math.round(st.sec % 60)).padStart(2, '0')}초`, 160, 111, COL.dim, { align: 'center' });
     button(64, 142, 94, 18, '결과 복사', copyResult);
     button(162, 142, 94, 18, '타이틀로', toTitle);
+    text(`${FEEDBACK} · 제작 유기농쵸비`, 160, 166, COL.dim, { align: 'center', scale: 10 / 12 });
   }
   function drawChoice() {
     const c = S.choice;
