@@ -20,7 +20,9 @@
     gold: '#e8c060', text: '#f4f0e6', dim: '#8a86a8', think: '#8cc8ff',
     testimony: '#7ee08a', red: '#e0505a', box: '#10101c', ink: '#0d0b14',
   };
-  const SAVE_KEY = 'nayuta-trial.save.v1';
+  // 저장은 대본 위치(pc)로 기억하므로, 대본이 바뀌면 옛 저장을 쓰지 않도록 대본 해시를 키에 붙인다
+  const scriptHash = (() => { let h = 5381; const t = JSON.stringify(CASE.script); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); })();
+  const SAVE_KEY = 'nayuta-trial.save.v1.' + scriptHash;
   const MAX_PATIENCE = 5;
 
   // ───────── 화면 맞춤: FHD 캔버스를 CSS로 화면 크기에 맞춘다 ─────────
@@ -399,7 +401,7 @@
     sub(press, enterCross);
   }
   // 틀릴 때마다 변호인이 속으로 힌트를 말한다. 같은 증언에서 여러 번 틀리면 더 분명한 힌트로 넘어간다
-  const wrongCount = new WeakMap();
+  let wrongCount = new WeakMap();
   function hintFor(op) {
     const hs = op && op.hints;
     if (!hs || !hs.length) return [];
@@ -451,6 +453,7 @@
   }
   function begin(from) {
     S.scene = 'play';
+    if (!from) wrongCount = new WeakMap(); // 새 게임이면 힌트 단계도 처음부터
     S.stack = [{ list: CASE.script, pc: from ? from.pc : 0 }];
     S.ev = from ? [...from.ev] : [...(CASE.startEvidence || [])];
     S.patience = from ? Math.max(from.patience, 1) : MAX_PATIENCE;
@@ -501,16 +504,19 @@
     else if (S.mode === 'chapter') { S.chapter = null; S.mode = 'idle'; step(); }
     else if (S.mode === 'testTitle') { S.testTitle = null; S.mode = 'idle'; afterTestTitle(); }
     else if (S.mode === 'stamp') { S.fx.stamp = null; S.mode = 'idle'; step(); }
+    else if (S.mode === 'cross') crossMove(1); // 신문 중에 화면을 누르면 다음 증언으로
   }
   addEventListener('keydown', (e) => {
     audio();
     const k = e.key;
     if (k === 'm' || k === 'M') { toggleMute(); return; }
+    if (k === 'f' || k === 'F') { toggleSpeed(); return; }
     if (S.scene === 'title') { if (k === 'Enter' || k === ' ') begin(null); return; }
     if (S.scene !== 'play') { if (k === 'Enter' || k === ' ') { S.scene === 'over' ? retry() : toTitle(); } return; }
     const ov = S.overlay;
     if (ov) {
       const n = S.ev.length;
+      if (!n) { if (k === 'Escape' || k === 'e' || k === 'E' || k === 'x' || k === 'X') closeOverlay(); e.preventDefault(); return; }
       if (k === 'ArrowUp' || k === 'ArrowLeft') { ov.sel = (ov.sel - 1 + n) % n; ov.page = 0; SFX.select(); }
       else if (k === 'ArrowDown' || k === 'ArrowRight') { ov.sel = (ov.sel + 1) % n; ov.page = 0; SFX.select(); }
       else if ((k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') && ov.purpose !== 'view') present(S.ev[ov.sel]);
@@ -529,6 +535,14 @@
     if (k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') { confirm(); e.preventDefault(); }
     else if ((k === 'e' || k === 'E') && S.mode === 'line') openOverlay('view');
   });
+  // 배속: 1 → 2 → 4 → 1. 다음 방문에도 기억한다
+  let speed = 1;
+  try { speed = [1, 2, 4].includes(+localStorage.getItem('nayuta-trial.speed')) ? +localStorage.getItem('nayuta-trial.speed') : 1; } catch (e) { speed = 1; }
+  function toggleSpeed() {
+    speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
+    try { localStorage.setItem('nayuta-trial.speed', String(speed)); } catch (e) { /* 이번 판에서만 기억 */ }
+    SFX.select();
+  }
   function toggleMute() {
     muted = !muted;
     try { localStorage.setItem('nayuta-trial.mute', muted ? '1' : '0'); } catch (e) { /* 무시 */ }
@@ -543,15 +557,17 @@
     fx.shake = Math.max(0, fx.shake - dt);
     fx.flash = Math.max(0, fx.flash - dt * 2.5);
     if (S.pocket) S.pocket.t += dt;
-    if (S.mode === 'stamp' && fx.stamp) { fx.stamp.t -= dt; if (fx.stamp.t <= 0) confirm(); }
-    if (S.mode === 'testTitle' && S.testTitle) { S.testTitle.t -= dt; if (S.testTitle.t <= 0) confirm(); }
+    // 배속은 글자 찍기와 연출 대기 시간에만 적용한다
+    const sdt = dt * speed;
+    if (S.mode === 'stamp' && fx.stamp) { fx.stamp.t -= sdt; if (fx.stamp.t <= 0) confirm(); }
+    if (S.mode === 'testTitle' && S.testTitle) { S.testTitle.t -= sdt; if (S.testTitle.t <= 0) confirm(); }
     const l = S.line;
     if (S.mode === 'line' && l && !S.overlay) {
       const len = pageLen(l);
       if (l.shown < len) {
-        l.shown = Math.min(len, l.shown + dt * CPS);
+        l.shown = Math.min(len, l.shown + sdt * CPS);
         const n = Math.floor(l.shown);
-        if (n - l.lastBlip >= 2) { l.lastBlip = n; SFX.blip(l.voice); }
+        if (n - l.lastBlip >= 2 * speed) { l.lastBlip = n; SFX.blip(l.voice); }
       }
     }
   }
@@ -615,6 +631,7 @@
       HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? COL.red : '#3a3040'); }));
     }
     const can = S.mode === 'line' || S.mode === 'cross';
+    button(206, 3, 56, 16, keyHint(`${speed}배속`, 'F'), toggleSpeed, { off: !!S.overlay });
     button(266, 3, 50, 16, keyHint('증거', 'E'), () => openOverlay(S.mode === 'cross' ? 'cross' : 'view'), { off: !can || !!S.overlay });
   }
   function drawNameTag(name) {
