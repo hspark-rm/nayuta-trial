@@ -4,12 +4,12 @@
 (() => {
   const W = 320, H = 180;
   const CASE = window.CASE;
+  // 배치는 320×180 좌표로 하고, 실제로는 6배(1920×1080, FHD)로 그린다.
+  // 사각형은 6픽셀 단위 도트가 되고, 글자와 초상화는 FHD 해상도로 선명하게 나온다.
+  const RES = 6;
   const cv = document.getElementById('game');
-  const out = cv.getContext('2d');
-  // 게임은 320×180 버퍼에 그리고, 매 프레임 화면 캔버스로 옮긴다
-  const buf = document.createElement('canvas');
-  buf.width = W; buf.height = H;
-  const g = buf.getContext('2d');
+  cv.width = W * RES; cv.height = H * RES;
+  const g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
   const TOUCH = matchMedia('(pointer: coarse)').matches;
   const keyHint = (label, key) => (TOUCH ? label : `${label} ${key}`);
@@ -23,16 +23,11 @@
   const SAVE_KEY = 'nayuta-trial.save.v1';
   const MAX_PATIENCE = 5;
 
-  // ───────── 화면 맞춤 ─────────
-  // 버퍼를 정수배(n)로 키워 캔버스에 그리고, CSS로 화면 크기(k배)에 맞춘다.
-  // n ≥ k 라서 도트 크기가 고르게 유지되고 화면도 꽉 찬다.
+  // ───────── 화면 맞춤: FHD 캔버스를 CSS로 화면 크기에 맞춘다 ─────────
   function fit() {
     const vw = window.visualViewport ? visualViewport.width : innerWidth;
     const vh = window.visualViewport ? visualViewport.height : innerHeight;
     const k = Math.min(vw / W, vh / H);
-    const n = Math.max(1, Math.ceil(k * (window.devicePixelRatio || 1)));
-    if (cv.width !== W * n) { cv.width = W * n; cv.height = H * n; }
-    out.imageSmoothingEnabled = false;
     cv.style.width = Math.floor(W * k) + 'px';
     cv.style.height = Math.floor(H * k) + 'px';
   }
@@ -51,45 +46,26 @@
     try { await screen.orientation.lock('landscape'); } catch (e) { /* 고정을 못 하면 사용자가 돌린다 */ }
   }
 
-  // ───────── 글자: 안티에일리어싱을 걷어 내야 도트 글꼴처럼 보인다 ─────────
+  // ───────── 글자: 도트 글꼴(갈무리)을 FHD 해상도 벡터로 그린다 ─────────
   const measure = document.createElement('canvas').getContext('2d');
-  const fontOf = (b) => `12px ${b ? 'Galmuri11Bold' : 'Galmuri11'}, "Apple SD Gothic Neo", sans-serif`;
+  const fontOf = (b, px = 12) => `${px}px ${b ? 'Galmuri11Bold' : 'Galmuri11'}, "Apple SD Gothic Neo", sans-serif`;
   function tw(s, b) { measure.font = fontOf(b); return Math.ceil(measure.measureText(s).width); }
-  function rgb(hex) { return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)); }
-  const tcache = new Map();
-  function textImg(s, color, b) {
-    const k = s + '\u0000' + color + (b ? 'B' : '');
-    let c = tcache.get(k);
-    if (c) return c;
-    if (tcache.size > 800) tcache.clear();
-    c = document.createElement('canvas');
-    c.width = Math.max(1, tw(s, b) + 2); c.height = 16;
-    const x = c.getContext('2d', { willReadFrequently: true });
-    x.font = fontOf(b); x.textBaseline = 'top'; x.fillStyle = color;
-    x.fillText(s, 0, 1);
-    const d = x.getImageData(0, 0, c.width, c.height), p = d.data, [r, gg, bb] = rgb(color);
-    for (let i = 0; i < p.length; i += 4) {
-      if (p[i + 3] >= 100) { p[i] = r; p[i + 1] = gg; p[i + 2] = bb; p[i + 3] = 255; } else p[i + 3] = 0;
-    }
-    x.putImageData(d, 0, 0);
-    tcache.set(k, c);
-    return c;
-  }
-  // clip: 앞에서부터 보여 줄 픽셀 폭(한 글자씩 찍는 효과용)
+  // clip: 앞에서부터 보여 줄 폭(한 글자씩 찍는 효과용), 좌표는 320×180 기준
   function text(s, x, y, color = COL.text, o = {}) {
     if (!s) return 0;
-    const img = textImg(s, color, o.bold);
-    const w = img.width, sc = o.scale || 1;
-    if (o.align === 'center') x = Math.round(x - (w * sc) / 2);
-    else if (o.align === 'right') x -= w * sc;
-    const cw = o.clip != null ? Math.min(o.clip, w) : w;
-    const put = (im, dx, dy) => g.drawImage(im, 0, 0, cw, im.height, dx, dy, cw * sc, im.height * sc);
-    if (o.outline) {
-      const ol = textImg(s, o.outline, o.bold);
-      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) put(ol, x + ox * sc, y + oy * sc);
-    } else if (o.shadow) put(textImg(s, o.shadow, o.bold), x + sc, y + sc);
-    put(img, x, y);
-    return w * sc;
+    const sc = o.scale || 1, w = tw(s, o.bold) * sc;
+    if (o.align === 'center') x = Math.round(x - w / 2);
+    else if (o.align === 'right') x -= w;
+    g.save();
+    g.font = fontOf(o.bold, 12 * sc);
+    g.textBaseline = 'top';
+    if (o.clip != null) { g.beginPath(); g.rect(x - 2, y - 2, o.clip * sc + 3, 16 * sc + 4); g.clip(); }
+    const put = (c, dx, dy) => { g.fillStyle = c; g.fillText(s, x + dx, y + sc + dy); };
+    if (o.outline) for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) put(o.outline, ox * sc, oy * sc);
+    else if (o.shadow) put(o.shadow, sc * 0.75, sc * 0.75);
+    put(color, 0, 0);
+    g.restore();
+    return w;
   }
   function wrap(s, maxW, b) {
     const out = [];
@@ -143,13 +119,17 @@
       for (const i of b) { p[i] = r; p[i + 1] = gg; p[i + 2] = bb; }
     }
   }
+  // w, h는 320×180 기준 크기. 캔버스는 RES배로 만든다. colors를 주면 색 수를 줄인다
   function pixelate(im, src, w, h, colors) {
-    const c = mk(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    const cw = Math.max(1, Math.round(w * RES)), ch = Math.max(1, Math.round(h * RES));
+    const c = mk(cw, ch), x = c.getContext('2d', { willReadFrequently: true });
     x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
-    x.drawImage(im, src.x, src.y, src.w, src.h, 0, 0, w, h);
-    const d = x.getImageData(0, 0, w, h);
-    quantize(d.data, colors);
-    x.putImageData(d, 0, 0);
+    x.drawImage(im, src.x, src.y, src.w, src.h, 0, 0, cw, ch);
+    if (colors) {
+      const d = x.getImageData(0, 0, cw, ch);
+      quantize(d.data, colors);
+      x.putImageData(d, 0, 0);
+    }
     return c;
   }
   // 투명 여백을 잘라 낸 실제 그림 범위
@@ -178,16 +158,17 @@
       if (r.h > r.w * 1.6) r.h = r.w * 1.3;
     }
     const s = Math.min(PORTRAIT_W / r.w, PORTRAIT_H / r.h);
-    return pixelate(im, r, Math.max(1, Math.round(r.w * s)), Math.max(1, Math.round(r.h * s)), 32);
+    // 초상화는 이미 도트 그림이라 색 수를 줄이지 않는다
+    return pixelate(im, r, r.w * s, r.h * s, 0);
   }
   function coverFrom(im, w, h) {
     const s = Math.max(w / im.naturalWidth, h / im.naturalHeight);
     const sw = w / s, sh = h / s;
-    return pixelate(im, { x: (im.naturalWidth - sw) / 2, y: (im.naturalHeight - sh) / 2, w: sw, h: sh }, w, h, 32);
+    return pixelate(im, { x: (im.naturalWidth - sw) / 2, y: (im.naturalHeight - sh) / 2, w: sw, h: sh }, w, h, 0);
   }
   function containFrom(im, w, h) {
     const r = alphaBox(im), s = Math.min(w / r.w, h / r.h);
-    return pixelate(im, r, Math.max(1, Math.round(r.w * s)), Math.max(1, Math.round(r.h * s)), 24);
+    return pixelate(im, r, r.w * s, r.h * s, 0);
   }
   // 상태: undefined = 아직 읽는 중, null = 파일 없음
   const imgs = new Map();
@@ -556,7 +537,7 @@
   }
   function drawCourt() {
     const bg = asset('bg:court', 'assets/bg/court.png', (im) => coverFrom(im, W, H));
-    if (bg) { g.drawImage(bg, 0, 0); return; }
+    if (bg) { g.drawImage(bg, 0, 0, W, H); return; }
     rect(0, 0, W, H, COL.wall);
     for (let x = 0; x < W; x += 32) rect(x + 8, 0, 16, 78, COL.wall2);
     rect(0, 14, W, 2, COL.trim);
@@ -586,7 +567,8 @@
     const c = portrait(p.id, p.face);
     if (c === undefined) return;
     if (c === null) { drawPlaceholder(p.id); return; }
-    g.drawImage(c, Math.round(160 - c.width / 2), 118 - c.height);
+    const pw = c.width / RES, ph = c.height / RES;
+    g.drawImage(c, 160 - pw / 2, 118 - ph, pw, ph);
   }
   const HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
   function drawHud() {
@@ -632,7 +614,7 @@
   }
   function evIcon(id, x, y) {
     const c = asset(`e:${id}`, `assets/evidence/${id}.png`, (im) => containFrom(im, 32, 32));
-    if (c) { g.drawImage(c, x + Math.floor((32 - c.width) / 2), y + Math.floor((32 - c.height) / 2)); return; }
+    if (c) { const iw = c.width / RES, ih = c.height / RES; g.drawImage(c, x + (32 - iw) / 2, y + (32 - ih) / 2, iw, ih); return; }
     const ev = CASE.evidence[id];
     rect(x + 4, y + 2, 24, 28, '#d8d0b8'); rect(x + 4, y + 2, 24, 4, ev.color || COL.gold);
     for (let i = 0; i < 4; i++) rect(x + 8, y + 10 + i * 5, 16 - (i % 2) * 5, 2, '#8a8070');
@@ -685,6 +667,7 @@
     text('증언', 160, 64, COL.testimony, { align: 'center', bold: true });
     text(S.testTitle.title, 160, 82, COL.text, { align: 'center', bold: true, scale: 1 });
   }
+  const TITLE = '나유타 재판', TAGLINE = '이 길이 아닌가?';
   const CREDIT = '비공식 팬 제작 · 원작: 승리의 여신: 니케 / SHIFT UP';
   const NOTICE = '비영리 팬 프로젝트 · 문제 시 즉시 삭제합니다';
   function drawTitle() {
@@ -693,8 +676,10 @@
       const x = (i * 73) % W, y = (i * 41 + Math.floor(S.t * 6 * ((i % 3) + 1))) % 120;
       rect(x, y, 1, 1, i % 4 ? '#3a3858' : '#6a68a0');
     }
-    text('나유타 재판', 160, 22, COL.gold, { align: 'center', bold: true, scale: 3, outline: COL.ink });
-    text(CASE.subtitle || '', 160, 70, COL.dim, { align: 'center' });
+    text(TITLE, 160, 10, COL.gold, { align: 'center', bold: true, scale: 3, outline: COL.ink });
+    // 부제 = 나유타의 시그니처 대사
+    text(TAGLINE, 160, 50, COL.text, { align: 'center', bold: true, scale: 1.5, outline: COL.ink });
+    text(CASE.subtitle || '', 160, 72, COL.dim, { align: 'center' });
     button(110, 88, 100, 18, '새로 시작', () => begin(null));
     button(110, 109, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
     const sound = muted ? '소리 꺼짐' : '소리 켜짐';
@@ -751,7 +736,7 @@
   }
   function draw() {
     B = [];
-    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.setTransform(RES, 0, 0, RES, 0, 0);
     if (portraitHeld()) drawRotate();
     else if (S.scene === 'title') drawTitle();
     else if (S.scene === 'skins') drawSkins();
@@ -760,9 +745,9 @@
     else if (S.mode === 'chapter') drawChapter();
     else {
       const sh = S.fx.shake > 0 ? 2 : 0;
-      g.setTransform(1, 0, 0, 1, sh ? Math.round(Math.random() * 4 - 2) : 0, sh ? Math.round(Math.random() * 4 - 2) : 0);
+      g.setTransform(RES, 0, 0, RES, sh ? Math.round(Math.random() * 4 - 2) * RES : 0, sh ? Math.round(Math.random() * 4 - 2) * RES : 0);
       drawCourt(); drawPortrait(); drawStand();
-      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.setTransform(RES, 0, 0, RES, 0, 0);
       drawHud();
       if (S.mode === 'line' && S.line) drawLine();
       else if (S.mode === 'cross') drawCross();
@@ -773,7 +758,6 @@
       if (S.mode === 'stamp' && S.fx.stamp) { B = []; drawStamp(); }
     }
     if (S.fx.flash > 0) rect(0, 0, W, H, `rgba(255,255,255,${S.fx.flash.toFixed(2)})`);
-    out.drawImage(buf, 0, 0, cv.width, cv.height);
   }
 
   // ───────── 시작: 글꼴을 기다린 뒤(최대 3초) 돌린다 ─────────
@@ -785,12 +769,7 @@
     requestAnimationFrame(loop);
   }
   const fonts = Promise.all([document.fonts.load('12px Galmuri11'), document.fonts.load('12px Galmuri11Bold')]);
-  Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).then(() => {
-    tcache.clear();
-    requestAnimationFrame(loop);
-  });
-  // 늦게 받은 글꼴로 다시 그리기
-  fonts.then(() => tcache.clear()).catch(() => {});
+  Promise.race([fonts, new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).then(() => requestAnimationFrame(loop));
 
   // 개발 확인용
   window.__nayuta = { S, step, present, begin, dataErrors };

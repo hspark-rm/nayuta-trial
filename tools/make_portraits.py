@@ -105,10 +105,12 @@ def remove_background(src, dest, tol=28):
     box = out.getbbox()
     if box:
         out = out.crop(box)
-    # 게임은 120×112로 줄여 쓰므로 360픽셀이면 충분하다(웹 배포·휴대폰 로딩용)
-    out.thumbnail((360, 360), Image.LANCZOS)
+    # FHD 화면에서 초상화 칸이 약 720×672 픽셀이라 720으로 맞춘다.
+    # 도트 그림은 색이 적어 128색 팔레트로 저장해도 보기엔 같고 파일이 작아진다(휴대폰 로딩용)
+    out.thumbnail((720, 720), Image.LANCZOS)
+    out = out.quantize(colors=128, method=Image.FASTOCTREE)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    out.save(dest)
+    out.save(dest, optimize=True)
     print(f"  저장: {dest.relative_to(ROOT)} ({out.width}×{out.height}, 배경 {bg.mean():.0%} 제거)")
 
 
