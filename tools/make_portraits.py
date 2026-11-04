@@ -31,6 +31,7 @@ CREDITS_PER_IMAGE = 11               # gpt-image-2.5-sunburst 실측(2026-10-04)
 FACES = {
     "nayuta": ["normal", "sad", "smile"],
     "anis": ["normal", "smile", "shock"],
+    "anis_star": ["normal", "smile", "shock"],  # 아니스: 스타(팝스타 의상), 아직 시나리오에 등장 전
     "hongryeon": ["normal", "drunk", "shock"],
 }
 FACE_DESC = {

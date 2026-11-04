@@ -61,6 +61,8 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 | `prosecutor` | normal, smile, angry, shock |
 | `judge` | normal |
 
+이격(같은 인물의 다른 버전)은 `data/case1.js`의 `variants`에 적고, 그림은 `assets/portraits/<이격 id>_<표정>.png`로 넣는다. 플레이어가 타이틀의 **의상**에서 고른다. 고른 이격에 그 표정 그림이 없으면 기본 그림을 쓴다. 지금은 `anis` ↔ `anis_star`(아니스: 스타).
+
 재판장과 검사는 원작에 없는 인물이다. 그림 없이 자리표시로 두어도 된다.
 
 ## 시나리오 고치기

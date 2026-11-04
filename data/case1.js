@@ -15,6 +15,11 @@ window.CASE = {
     me:         { name: '지휘관',  voice: 220, portrait: false },
   },
 
+  // 이격(같은 인물의 다른 버전). 타이틀의 '의상'에서 고른다. id = 그림 파일 이름 앞부분
+  variants: {
+    anis: [{ id: 'anis', label: '기본' }, { id: 'anis_star', label: '스타' }],
+  },
+
   evidence: {
     e1: { name: '거래 기록', color: '#e8c060',
       desc: 'EDEN SPEAR 무렵. 니힐리스타는 바디에 언체인드를 뿌려 퀸을 독살하려 했다. 이 거래는 니힐리스타가 먼저 제안했다.' },

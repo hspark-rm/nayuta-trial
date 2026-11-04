@@ -205,11 +205,31 @@
     }
     return e.state === 'ok' ? e.canvas : e.state === 'missing' ? null : undefined;
   }
-  function portrait(id, face) {
+  // 이격 선택: 인물 id → 그림 id. 고른 버전의 그림이 없으면 기본 그림으로 돌아간다
+  const SKIN_KEY = 'nayuta-trial.skins';
+  let skins = {};
+  try { skins = JSON.parse(localStorage.getItem(SKIN_KEY) || '{}') || {}; } catch (e) { skins = {}; }
+  const skinOf = (id) => {
+    const vs = (CASE.variants || {})[id];
+    return vs && vs.some((v) => v.id === skins[id]) ? skins[id] : id;
+  };
+  function cycleSkin(id, d) {
+    const vs = CASE.variants[id];
+    const i = Math.max(0, vs.findIndex((v) => v.id === skinOf(id)));
+    skins[id] = vs[(i + d + vs.length) % vs.length].id;
+    try { localStorage.setItem(SKIN_KEY, JSON.stringify(skins)); } catch (e) { /* 이번 판에서만 기억 */ }
+    SFX.select();
+  }
+  function portraitImg(img, id, face) {
     const ch = CASE.chars[id];
-    const c = asset(`p:${id}_${face}`, `assets/portraits/${id}_${face}.png`, (im) => portraitFrom(im, ch));
-    if (c === null && face !== 'normal') return portrait(id, 'normal');
+    const c = asset(`p:${img}_${face}`, `assets/portraits/${img}_${face}.png`, (im) => portraitFrom(im, ch));
+    if (c === null && face !== 'normal') return portraitImg(img, id, 'normal');
     return c;
+  }
+  function portrait(id, face) {
+    const img = skinOf(id);
+    const c = portraitImg(img, id, face);
+    return c === null && img !== id ? portraitImg(id, id, face) : c;
   }
 
   // ───────── 소리: 웹 오디오로 만든 짧은 칩튠 효과음 ─────────
@@ -677,10 +697,12 @@
     button(110, 96, 100, 18, '새로 시작', () => begin(null));
     button(110, 117, 100, 18, '이어하기', () => begin(S.saved), { off: !S.saved });
     const sound = muted ? '소리 꺼짐' : '소리 켜짐';
-    if (canFull && !isFull()) {
-      button(84, 138, 74, 18, sound, toggleMute);
-      button(162, 138, 74, 18, '전체 화면', goFull);
-    } else button(110, 138, 100, 18, sound, toggleMute);
+    const hasSkins = Object.keys(CASE.variants || {}).length > 0;
+    const row = [[sound, toggleMute]];
+    if (hasSkins) row.push(['의상', () => { S.scene = 'skins'; }]);
+    if (canFull && !isFull()) row.push(['전체 화면', goFull]);
+    const bw = 64, gap = 10, x0 = Math.round(160 - (row.length * bw + (row.length - 1) * gap) / 2);
+    row.forEach(([label, fn], i) => button(x0 + i * (bw + gap), 138, bw, 18, label, fn));
     text(CREDIT, 160, 164, COL.dim, { align: 'center' });
     text('v0.1', 316, 2, '#4a4870', { align: 'right' });
     if (dataErrors.length) text(`데이터 오류 ${dataErrors.length}건 (콘솔 확인)`, 4, 2, COL.red);
@@ -699,6 +721,23 @@
     wrap(e.text || '', 280).forEach((s, i) => text(s, 160, 90 + i * 14, COL.text, { align: 'center' }));
     button(110, 140, 100, 18, '타이틀로', toTitle);
   }
+  function drawSkins() {
+    rect(0, 0, W, H, COL.night);
+    text('의상 고르기', 160, 8, COL.gold, { align: 'center', bold: true });
+    Object.keys(CASE.variants).forEach((id, i) => {
+      const y = 30 + i * 22, vs = CASE.variants[id];
+      const cur = vs.find((v) => v.id === skinOf(id)) || vs[0];
+      text(CASE.chars[id].name, 24, y + 2, COL.text, { bold: true });
+      button(92, y, 20, 18, '◀', () => cycleSkin(id, -1));
+      text(cur.label, 152, y + 2, COL.gold, { align: 'center' });
+      button(192, y, 20, 18, '▶', () => cycleSkin(id, 1));
+    });
+    // 첫 인물의 고른 그림 미리 보기
+    const first = Object.keys(CASE.variants)[0];
+    const pv = first && portrait(first, 'normal');
+    if (pv) { rect(222, 26, 90, 104, '#1a1830'); g.drawImage(pv, 0, 0, pv.width, pv.height, 224, 28, 86, Math.round((86 * pv.height) / pv.width)); }
+    button(110, 150, 100, 18, '돌아가기', toTitle);
+  }
   function drawRotate() {
     rect(0, 0, W, H, COL.night);
     // 휴대폰 모양을 눕히는 그림
@@ -713,6 +752,7 @@
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (portraitHeld()) drawRotate();
     else if (S.scene === 'title') drawTitle();
+    else if (S.scene === 'skins') drawSkins();
     else if (S.scene === 'over') drawOver();
     else if (S.scene === 'end') drawEnd();
     else if (S.mode === 'chapter') drawChapter();
