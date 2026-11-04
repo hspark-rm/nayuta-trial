@@ -237,7 +237,52 @@
     stamp: () => { tone(220, 0.12, 'square', 0.06, 440); tone(880, 0.25, 'square', 0.05, 0, 0.1); },
     select: () => tone(660, 0.03, 'square', 0.03),
     give: () => { tone(784, 0.07); tone(1046, 0.14, 'square', 0.04, 0, 0.07); },
+    murmur: () => { for (let i = 0; i < 6; i++) tone(180 + Math.random() * 120, 0.12, 'triangle', 0.02, -30, i * 0.07); },
+    fanfare: () => [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, i === 5 ? 0.5 : 0.14, 'square', 0.04, 0, i * 0.14)),
   };
+
+  // ───────── 배경음악: 8분음표 단위 칩튠 순서기(직접 작곡, 원작 음악 아님) ─────────
+  // 0은 쉼표, 숫자는 MIDI 음 번호. 장면에 맞는 곡을 고르면 그 곡을 반복한다
+  const MUSIC = {
+    title:   { bpm: 100, mel: [67,0,72,0,74,0,76,74, 72,0,67,0,69,0,71,0, 72,0,76,0,79,0,77,76, 74,0,72,0,71,0,0,0],
+               bas: [48,0,55,0,48,0,55,0, 45,0,52,0,43,0,50,0, 48,0,55,0,41,0,48,0, 43,0,50,0,43,0,50,0] },
+    mystery: { bpm: 72, mel: [69,0,72,0,76,0,74,0, 72,0,69,0,67,0,0,0, 69,0,72,0,77,0,76,0, 74,0,72,0,71,0,0,0],
+               bas: [45,0,0,0,45,0,0,0, 43,0,0,0,40,0,0,0, 41,0,0,0,41,0,0,0, 40,0,0,0,40,0,0,0] },
+    court:   { bpm: 104, mel: [62,0,65,67,69,0,67,65, 64,0,62,0,60,62,64,0, 62,0,65,67,69,0,72,70, 69,67,65,64,62,0,0,0],
+               bas: [38,0,45,0,38,0,45,0, 36,0,43,0,36,0,43,0, 38,0,45,0,38,0,45,0, 34,0,41,0,33,0,40,0] },
+    cross:   { bpm: 132, mel: [74,0,74,72,74,0,77,0, 76,0,74,72,69,0,0,0, 74,0,74,72,74,0,79,0, 77,76,74,72,74,0,0,0],
+               bas: [38,38,0,38,38,0,38,0, 36,36,0,36,36,0,36,0, 34,34,0,34,34,0,34,0, 33,33,0,33,40,0,40,0] },
+  };
+  const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+  const music = { id: null, step: 0, next: 0 };
+  function noteAt(freq, t, dur, type, vol) {
+    const o = AC.createOscillator(), gn = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn).connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function wantedMusic() {
+    if (muted) return null;
+    if (S.scene === 'title' || S.scene === 'skins') return 'title';
+    if (S.scene !== 'play' || S.mode === 'chapter') return null;
+    if (S.bg === 'void') return 'mystery';
+    if (S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand) return 'cross';
+    return 'court';
+  }
+  // 0.25초 앞까지 음을 미리 예약한다(프레임이 늦어도 박자가 흔들리지 않게)
+  setInterval(() => {
+    if (!AC || AC.state !== 'running') return;
+    const want = wantedMusic();
+    if (want !== music.id) { music.id = want; music.step = 0; music.next = AC.currentTime + 0.05; }
+    if (!want) return;
+    const tr = MUSIC[want], dt = 60 / tr.bpm / 2;
+    while (music.next < AC.currentTime + 0.25) {
+      const m = tr.mel[music.step % tr.mel.length], b = tr.bas[music.step % tr.bas.length];
+      if (m) noteAt(midi(m), music.next, dt * 0.9, 'square', 0.018);
+      if (b) noteAt(midi(b), music.next, dt * 1.6, 'triangle', 0.03);
+      music.step++; music.next += dt;
+    }
+  }, 60);
 
   // ───────── 데이터 점검: 시나리오를 손으로 고칠 때 깨진 연결을 바로 알려 준다 ─────────
   const labels = new Map();
@@ -252,6 +297,7 @@
       const at = `${where}#${i}`;
       if (op.who) needChar(op.who, at);
       if (op.op === 'goto') needLabel(op.id, at);
+      if (op.op === 'choice') (op.options || []).forEach((o) => needLabel(o.goto, at));
       if (op.op === 'give') needEv(op.id, at);
       if (op.op === 'demand') { needEv(op.answer, at); needLabel(op.ok, at); needChar(op.who, at); walk(op.wrong || [], at + '.wrong'); }
       if (op.op === 'testimony') {
@@ -275,7 +321,8 @@
     line: null, portrait: null, test: null, overlay: null, demand: null,
     chapter: null, testTitle: null, end: null, hinted: false,
     bg: 'court', pocket: null, pockets: 0, // pocket = 주머니에서 막 나온 증거품 카드
-    fx: { shake: 0, flash: 0, stamp: null }, t: 0,
+    fx: { shake: 0, flash: 0, stamp: null, murmur: null }, t: 0,
+    choice: null, log: [], logView: null, stats: null, toast: null,
   };
   // 증거품을 받을 때 변호인이 하는 말(차례로 돌아가며 씀). 명령에 line이 있으면 그것을 쓴다
   const POCKET_LINES = [
@@ -317,6 +364,7 @@
       case 'fx':
         if (op.kind === 'shake') S.fx.shake = 0.35;
         if (op.kind === 'flash') S.fx.flash = 1;
+        if (op.kind === 'murmur') { S.fx.murmur = { t: 1.6, text: op.text || '웅성웅성…' }; SFX.murmur(); }
         if (op.kind === 'stamp') { S.fx.stamp = { text: op.text, t: 1.1 }; S.mode = 'stamp'; SFX.stamp(); return true; }
         return false;
       case 'give': {
@@ -339,7 +387,8 @@
         S.demand = op;
         sub([{ who: op.who, face: op.face, line: op.line }], () => openOverlay('demand'));
         return true;
-      case 'end': S.scene = 'end'; S.end = op; lockInput(); clearSave(); if (op.result === 'win') SFX.ok(); return true;
+      case 'end': S.scene = 'end'; S.end = op; lockInput(); clearSave(); if (op.result === 'win') SFX.fanfare(); return true;
+      case 'choice': S.choice = { op, sel: 0 }; S.mode = 'choice'; return true;
       default: console.warn('모르는 명령', op); return false;
     }
   }
@@ -359,6 +408,9 @@
       pages, page: 0, shown: 0, lastBlip: 0, raw: op.line,
     };
     S.mode = 'line';
+    // 대사 기록: 지나간 대사를 다시 읽을 수 있게 남긴다(최근 300줄)
+    S.log.push({ name: ch ? ch.name : null, text: op.line, color: S.line.color });
+    if (S.log.length > 300) S.log.shift();
   }
   // 글꼴이 늦게 로드되면 글자 폭이 바뀌므로 지금 대사의 줄바꿈을 다시 계산한다
   function rewrapLine() {
@@ -416,6 +468,7 @@
   function hintFor(op) {
     const hs = op && op.hints;
     if (!hs || !hs.length) return [];
+    S.stats.hints++;
     const n = wrongCount.get(op) || 0;
     wrongCount.set(op, n + 1);
     return [{ who: 'me', line: hs[Math.min(n, hs.length - 1)] }];
@@ -423,6 +476,8 @@
   function wrong(lines, then, op) {
     S.patience = Math.max(0, S.patience - 1);
     S.fx.shake = 0.4; SFX.wrong();
+    S.stats.wrongs++;
+    S.fx.murmur = { t: 1.4, text: '수군수군…' }; // 방청석이 웃음 섞인 반응
     const ls = lines && lines.length ? lines : [{ who: 'judge', line: '그 증거로는 아무것도 증명되지 않습니다.' }];
     S.overlay = null; S.mode = 'idle';
     sub(S.patience > 0 ? [...ls, ...hintFor(op)] : ls, () => { if (S.patience <= 0) gameOver(); else then(); });
@@ -455,7 +510,7 @@
   }
 
   // ───────── 저장 1칸 ─────────
-  function snapshot() { return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted, bg: S.bg, pockets: S.pockets }; }
+  function snapshot() { return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted, bg: S.bg, pockets: S.pockets, stats: { ...S.stats } }; }
   function save() {
     S.saved = snapshot();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.saved)); } catch (e) { /* 저장소를 못 쓰면 이번 판에서만 기억 */ }
@@ -470,6 +525,9 @@
     S.stack = [{ list: CASE.script, pc: from ? from.pc : 0 }];
     S.ev = from ? [...from.ev] : [...(CASE.startEvidence || [])];
     S.patience = MAX_PATIENCE; // 이어하기·다시하기 모두 하트를 채워서 시작
+    S.stats = from && from.stats ? { ...from.stats } : { wrongs: 0, hints: 0, overs: 0, sec: 0 };
+    S.choice = null; S.logView = null; S.fx.murmur = null;
+    if (!from) S.log = [];
     S.hinted = from ? !!from.hinted : false;
     S.bg = (from && from.bg) || 'court';
     S.pockets = (from && from.pockets) || 0;
@@ -478,7 +536,7 @@
     S.mode = 'idle';
     step();
   }
-  function gameOver() { S.scene = 'over'; S.overlay = null; S.mode = 'idle'; lockInput(); }
+  function gameOver() { S.scene = 'over'; S.overlay = null; S.mode = 'idle'; S.stats.overs++; lockInput(); }
   // 엔딩·패소·타이틀로 바뀐 직후 Enter 연타로 화면이 건너뛰어지지 않게 잠깐 입력을 막는다
   let lockUntil = 0;
   function lockInput() { lockUntil = performance.now() + 600; }
@@ -517,7 +575,7 @@
     confirm();
   });
   function confirm() {
-    if (S.scene !== 'play' || S.overlay) return;
+    if (S.scene !== 'play' || S.overlay || S.logView || S.mode === 'choice') return;
     if (S.mode === 'line') advanceLine();
     else if (S.mode === 'chapter') { S.chapter = null; S.mode = 'idle'; step(); }
     else if (S.mode === 'testTitle') { S.testTitle = null; S.mode = 'idle'; afterTestTitle(); }
@@ -540,6 +598,19 @@
       return;
     }
     if (S.scene !== 'play') { if (k === 'Enter' || k === ' ') { S.scene === 'over' ? retry() : toTitle(); } return; }
+    if (S.logView) {
+      if (k === 'ArrowUp') logScroll(1); else if (k === 'ArrowDown') logScroll(-1);
+      else if (k === 'Escape' || k === 'l' || k === 'L' || k === 'Enter') S.logView = null;
+      e.preventDefault(); return;
+    }
+    if (k === 'l' || k === 'L') { openLog(); return; }
+    if (S.mode === 'choice') {
+      const n = S.choice.op.options.length;
+      if (k === 'ArrowUp') { S.choice.sel = (S.choice.sel - 1 + n) % n; SFX.select(); }
+      else if (k === 'ArrowDown') { S.choice.sel = (S.choice.sel + 1) % n; SFX.select(); }
+      else if (k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') choose(S.choice.sel);
+      e.preventDefault(); return;
+    }
     const ov = S.overlay;
     if (ov) {
       const n = S.ev.length;
@@ -562,6 +633,48 @@
     if (k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') { confirm(); e.preventDefault(); }
     else if ((k === 'e' || k === 'E') && S.mode === 'line') openOverlay('view');
   });
+  function choose(i) {
+    if (S.mode !== 'choice') return;
+    const o = S.choice.op.options[i];
+    S.log.push({ name: CASE.chars.me ? CASE.chars.me.name : null, text: `▶ ${o.label}`, color: COL.think });
+    S.choice = null; S.mode = 'idle'; SFX.select();
+    jumpTo(o.goto); step();
+  }
+  // 대사 기록 창: 맨 아래(최근)부터 보고, ▲로 올려 본다
+  const LOG_ROWS = 10, LOG_DS = 10 / 12;
+  function logRows() {
+    const rows = [];
+    for (const e of S.log) {
+      const prefix = e.name ? `${e.name}: ` : '';
+      wrap(prefix + e.text, 284 / LOG_DS).forEach((r, i) => rows.push({ text: r, color: e.color, name: i === 0 && e.name ? e.name : null }));
+      rows.push(null); // 줄 사이 빈칸
+    }
+    return rows;
+  }
+  function openLog() { if (S.scene !== 'play' || S.overlay || S.logView) return; S.logView = { off: 0 }; SFX.select(); }
+  function logScroll(d) {
+    const max = Math.max(0, logRows().length - LOG_ROWS);
+    S.logView.off = Math.max(0, Math.min(max, S.logView.off + d * 3));
+  }
+  addEventListener('wheel', (e) => { if (S.logView) logScroll(e.deltaY < 0 ? 1 : -1); }, { passive: true });
+  // 결과 공유 글: 카페 댓글에 붙여 넣기 좋게 한 덩어리로
+  function resultText() {
+    const st = S.stats || { wrongs: 0, hints: 0, overs: 0, sec: 0 };
+    const m = Math.floor(st.sec / 60), sc = Math.round(st.sec % 60);
+    return `[나유타 재판: 이 길이 아닌가?] ${S.end ? S.end.title : ''}!\n` +
+      `실수 ${st.wrongs}회 · 힌트 ${st.hints}번 · 패소 ${st.overs}번 · ${m}분 ${String(sc).padStart(2, '0')}초\n` +
+      location.href.split('?')[0];
+  }
+  function copyResult() {
+    const t = resultText();
+    const done = () => { S.toast = { t: 1.6, text: '결과를 복사했습니다' }; SFX.select(); };
+    const fallback = () => {
+      const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { S.toast = { t: 2, text: '복사하지 못했습니다' }; }
+      ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fallback); else fallback();
+  }
   // 배속: 1 → 2 → 4 → 1. 다음 방문에도 기억한다
   let speed = 1;
   try { speed = [1, 2, 4].includes(+localStorage.getItem('nayuta-trial.speed')) ? +localStorage.getItem('nayuta-trial.speed') : 1; } catch (e) { speed = 1; }
@@ -574,13 +687,17 @@
     muted = !muted;
     try { localStorage.setItem('nayuta-trial.mute', muted ? '1' : '0'); } catch (e) { /* 무시 */ }
   }
-  function retry() { begin(S.saved ? { ...S.saved, patience: MAX_PATIENCE } : null); }
+  // 다시하기는 저장 위치로 돌아가되 실수·패소 기록은 이어 간다
+  function retry() { begin(S.saved ? { ...S.saved, patience: MAX_PATIENCE, stats: { ...S.stats } } : null); }
   function toTitle() { S.scene = 'title'; titleSel = S.saved ? 1 : 0; lockInput(); }
 
   // ───────── 갱신 ─────────
   function update(dt) {
     S.t += dt;
+    if (S.scene === 'play' && S.stats) S.stats.sec += dt;
     const fx = S.fx;
+    if (fx.murmur) { fx.murmur.t -= dt; if (fx.murmur.t <= 0) fx.murmur = null; }
+    if (S.toast) { S.toast.t -= dt; if (S.toast.t <= 0) S.toast = null; }
     fx.shake = Math.max(0, fx.shake - dt);
     fx.flash = Math.max(0, fx.flash - dt * 2.5);
     if (S.pocket) S.pocket.t += dt;
@@ -658,6 +775,7 @@
       HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? COL.red : '#3a3040'); }));
     }
     const can = S.mode === 'line' || S.mode === 'cross';
+    button(146, 3, 56, 16, keyHint('기록', 'L'), openLog, { off: !!S.overlay || !S.log.length });
     button(206, 3, 56, 16, keyHint(`${speed}배속`, 'F'), toggleSpeed, { off: !!S.overlay });
     button(266, 3, 50, 16, keyHint('증거', 'E'), () => openOverlay(S.mode === 'cross' ? 'cross' : 'view'), { off: !can || !!S.overlay });
   }
@@ -802,10 +920,41 @@
   }
   function drawEnd() {
     rect(0, 0, W, H, COL.night);
-    const e = S.end;
-    text(e.title, 160, 40, e.result === 'win' ? COL.gold : COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
-    wrap(e.text || '', 280).forEach((s, i) => text(s, 160, 90 + i * 14, COL.text, { align: 'center' }));
-    button(110, 140, 100, 18, '타이틀로', toTitle);
+    const e = S.end, st = S.stats || { wrongs: 0, hints: 0, overs: 0, sec: 0 };
+    text(e.title, 160, 22, e.result === 'win' ? COL.gold : COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
+    wrap(e.text || '', 280).forEach((s, i) => text(s, 160, 68 + i * 14, COL.text, { align: 'center' }));
+    // 결과 요약 — 카페에 공유하기 좋게
+    frameBox(70, 90, 180, 40);
+    text(`실수 ${st.wrongs}회 · 힌트 ${st.hints}번 · 패소 ${st.overs}번`, 160, 96, COL.text, { align: 'center' });
+    text(`플레이 시간 ${Math.floor(st.sec / 60)}분 ${String(Math.round(st.sec % 60)).padStart(2, '0')}초`, 160, 111, COL.dim, { align: 'center' });
+    button(64, 142, 94, 18, '결과 복사', copyResult);
+    button(162, 142, 94, 18, '타이틀로', toTitle);
+  }
+  function drawChoice() {
+    const c = S.choice;
+    frameBox(4, 118, 312, 58);
+    text(c.op.prompt || '어떻게 할까?', 12, 122, COL.gold, { scale: 10 / 12 });
+    c.op.options.forEach((o, i) => button(16, 134 + i * 20, 288, 18, o.label, () => choose(i), { sel: c.sel === i && pointer.x < 0 }));
+  }
+  function drawLog() {
+    rect(0, 0, W, H, 'rgba(7,6,12,0.85)');
+    frameBox(12, 8, 296, 164);
+    text('대사 기록', 20, 12, COL.gold, { bold: true });
+    const rows = logRows(), lv = S.logView;
+    const end = rows.length - lv.off, startRow = Math.max(0, end - LOG_ROWS);
+    rows.slice(startRow, end).forEach((r, i) => { if (r) text(r.text, 20, 30 + i * 12, r.color || COL.text, { scale: LOG_DS }); });
+    const max = Math.max(0, rows.length - LOG_ROWS);
+    button(200, 152, 30, 16, '▲', () => logScroll(1), { off: lv.off >= max });
+    button(234, 152, 30, 16, '▼', () => logScroll(-1), { off: lv.off <= 0 });
+    button(268, 152, 34, 16, '닫기', () => { S.logView = null; });
+  }
+  function drawMurmur() {
+    const m = S.fx.murmur, j = (k) => Math.round(Math.sin(S.t * 18 + k) * 1.5);
+    const a = Math.min(1, m.t * 2);
+    g.globalAlpha = a;
+    text(m.text, 52 + j(1), 52 + j(2), COL.text, { align: 'center', outline: COL.ink, scale: 10 / 12 });
+    text(m.text, 270 + j(3), 64 + j(4), COL.text, { align: 'center', outline: COL.ink, scale: 10 / 12 });
+    g.globalAlpha = 1;
   }
   function drawSkins() {
     rect(0, 0, W, H, COL.night);
@@ -848,15 +997,19 @@
       drawCourt(); drawPortrait(); if (S.bg !== 'void') drawStand();
       g.setTransform(RES, 0, 0, RES, 0, 0);
       drawHud();
+      if (S.fx.murmur && S.bg !== 'void') drawMurmur();
       if (S.mode === 'line' && S.line) drawLine();
       else if (S.mode === 'cross') drawCross();
+      else if (S.mode === 'choice' && S.choice) drawChoice();
       else frameBox(4, 118, 312, 58);
       if (S.pocket) drawPocket();
       // 위에 덮는 화면이 뜨면 아래 버튼은 눌리지 않게 비운다
       if (S.mode === 'testTitle' && S.testTitle) { B = []; drawTestTitle(); }
       if (S.overlay) { B = []; drawOverlay(); }
       if (S.mode === 'stamp' && S.fx.stamp) { B = []; drawStamp(); }
+      if (S.logView) { B = []; drawLog(); }
     }
+    if (S.toast) { frameBox(90, 150, 140, 20); text(S.toast.text, 160, 153, COL.gold, { align: 'center' }); }
     if (S.fx.flash > 0) rect(0, 0, W, H, `rgba(255,255,255,${S.fx.flash.toFixed(2)})`);
   }
 
@@ -873,5 +1026,5 @@
   fonts.then(rewrapLine).catch(() => {});
 
   // 개발 확인용
-  window.__nayuta = { S, step, present, begin, dataErrors };
+  window.__nayuta = { S, step, present, begin, dataErrors, music, resultText };
 })();
