@@ -1118,12 +1118,19 @@
     text('v0.1', 316, 2, '#4a4870', { align: 'right' });
     if (dataErrors.length) text(`데이터 오류 ${dataErrors.length}건 (콘솔 확인)`, 4, 2, COL.red);
   }
+  // 패소 화면: 나유타가 나와 태연하게 위로한다(왼쪽 초상, 오른쪽 버튼, 아래 대사)
+  const OVER_LINE = '승리했으니 괜찮소. 소인은 소인의 목숨을 중히 여기지 않소.';
   function drawOver() {
     rect(0, 0, W, H, COL.night);
-    text('패소', 160, 40, COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
-    text('재판장의 인내심이 바닥났다.', 160, 86, COL.text, { align: 'center' });
-    button(90, 110, 140, 18, '마지막 저장 지점부터', retry);
-    button(90, 132, 140, 18, '타이틀로', toTitle);
+    const c = portrait('nayuta', 'smile');
+    if (c) { const pw = c.width / RES, ph = c.height / RES; g.drawImage(c, 84 - pw / 2, 122 - ph, pw, ph); }
+    text('패소', 238, 14, COL.red, { align: 'center', bold: true, scale: 3, outline: COL.ink });
+    text('재판장의 인내심이 바닥났다.', 238, 58, COL.dim, { align: 'center', scale: 10 / 12 });
+    button(168, 76, 140, 18, '마지막 저장 지점부터', retry);
+    button(168, 98, 140, 18, '타이틀로', toTitle);
+    frameBox(4, 122, 312, 54);
+    drawNameTag(CASE.chars.nayuta.name);
+    wrap(OVER_LINE, LINE_W).slice(0, LINES).forEach((s, i) => text(s, 12, 128 + i * 14, COL.text, { shadow: COL.ink }));
   }
   function drawEnd() {
     rect(0, 0, W, H, COL.night);
