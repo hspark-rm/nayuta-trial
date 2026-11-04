@@ -250,6 +250,8 @@
                bas: [45,0,0,0,45,0,0,0, 43,0,0,0,40,0,0,0, 41,0,0,0,41,0,0,0, 40,0,0,0,40,0,0,0] },
     court:   { bpm: 104, mel: [62,0,65,67,69,0,67,65, 64,0,62,0,60,62,64,0, 62,0,65,67,69,0,72,70, 69,67,65,64,62,0,0,0],
                bas: [38,0,45,0,38,0,45,0, 36,0,43,0,36,0,43,0, 38,0,45,0,38,0,45,0, 34,0,41,0,33,0,40,0] },
+    invest:  { bpm: 92, mel: [72,0,76,0,79,0,76,0, 74,0,77,0,81,0,77,0, 76,0,79,0,84,0,79,0, 77,76,74,72,71,0,0,0],
+               bas: [48,0,55,0,52,0,55,0, 50,0,57,0,53,0,57,0, 48,0,55,0,52,0,55,0, 43,0,50,0,43,0,47,0] },
     cross:   { bpm: 132, mel: [74,0,74,72,74,0,77,0, 76,0,74,72,69,0,0,0, 74,0,74,72,74,0,79,0, 77,76,74,72,74,0,0,0],
                bas: [38,38,0,38,38,0,38,0, 36,36,0,36,36,0,36,0, 34,34,0,34,34,0,34,0, 33,33,0,33,40,0,40,0] },
   };
@@ -265,6 +267,7 @@
     if (muted) return null;
     if (S.scene === 'title' || S.scene === 'skins') return 'title';
     if (S.scene !== 'play' || S.mode === 'chapter') return null;
+    if (S.inv) return 'invest';
     if (S.bg === 'void' || S.bg === 'nightmare' || S.bg === 'night') return 'mystery';
     if (S.bg === 'lobby') return 'title';
     if (S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand) return 'cross';
@@ -301,6 +304,20 @@
       if (op.op === 'choice') (op.options || []).forEach((o) => needLabel(o.goto, at));
       if (op.op === 'give') needEv(op.id, at);
       if (op.op === 'demand') { needEv(op.answer, at); needLabel(op.ok, at); needChar(op.who, at); walk(op.wrong || [], at + '.wrong'); }
+      if (op.op === 'investigate') {
+        if (!op.places || !op.places[op.start]) dataErrors.push(`조사 시작 장소 '${op.start}'가 없음 (${at})`);
+        for (const [pid, pl] of Object.entries(op.places || {})) {
+          const pat = `${at}.${pid}`;
+          needChar(pl.who, pat);
+          (pl.needs || []).forEach((id) => needEv(id, pat));
+          (pl.move || []).forEach((m) => { if (!op.places[m]) dataErrors.push(`없는 장소 '${m}' (${pat}.move)`); });
+          walk(pl.enter || [], pat + '.enter');
+          (pl.spots || []).forEach((s, k) => { (s.needs || []).forEach((id) => needEv(id, `${pat}.spot${k}`)); walk(s.lines || [], `${pat}.spot${k}`); walk(s.again || [], `${pat}.spot${k}.again`); });
+          (pl.talk || []).forEach((s, k) => { (s.needs || []).forEach((id) => needEv(id, `${pat}.talk${k}`)); walk(s.lines || [], `${pat}.talk${k}`); walk(s.again || [], `${pat}.talk${k}.again`); });
+        }
+        ((op.done && op.done.needs) || []).forEach((id) => needEv(id, at + '.done'));
+        walk((op.done && op.done.lines) || [], at + '.done');
+      }
       if (op.op === 'testimony') {
         needChar(op.witness, at);
         walk(op.wrong || [], at + '.wrong');
@@ -324,6 +341,7 @@
     bg: 'court', pocket: null, pockets: 0, // pocket = 주머니에서 막 나온 증거품 카드
     fx: { shake: 0, flash: 0, stamp: null, murmur: null }, t: 0,
     choice: null, log: [], logView: null, stats: null, toast: null,
+    inv: null, // 조사 파트: { op, place, seen, talked, visited, menu, sel, acts }
   };
   // 증거품을 받을 때 변호인이 하는 말(차례로 돌아가며 씀). 명령에 line이 있으면 그것을 쓴다
   const POCKET_LINES = [
@@ -332,6 +350,7 @@
     '(넣은 기억이 없는데… 주머니가 알아서 증거를 모으나?)',
     '(주머니가 묵직하다. …설마 또?)',
   ];
+  const FIND_LINES = ['(…이건 증거가 될 것 같다. 챙겨 두자.)', '(이것도 챙겨 두자. 법정에서 쓸 수 있을지도 모른다.)', '(좋아, 하나 더 찾았다.)'];
   try { S.saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { S.saved = null; }
 
   // ───────── 진행기: 명령을 차례로 실행하다가 입력을 기다리는 명령에서 멈춘다 ─────────
@@ -376,7 +395,8 @@
         S.pocket = { id: op.id, t: 0 };
         const nm = CASE.evidence[op.id].name, pt = josa(nm, '을', '를').slice(nm.length);
         const got = { who: null, color: COL.gold, line: `「${nm}」${pt} 증거 목록에 넣었다.` };
-        const react = op.line === false ? [] : [{ who: 'me', face: op.face || 'shock', line: op.line || POCKET_LINES[S.pockets++ % POCKET_LINES.length] }];
+        const auto = S.inv ? FIND_LINES[S.pockets++ % FIND_LINES.length] : POCKET_LINES[S.pockets++ % POCKET_LINES.length];
+        const react = op.line === false ? [] : [{ who: 'me', face: op.face || (S.inv ? 'confident' : 'shock'), line: op.line || auto }];
         sub([...react, got], () => { S.pocket = null; step(); });
         return true;
       }
@@ -385,6 +405,7 @@
       case 'save': S.patience = MAX_PATIENCE; save(); return false;
       case 'chapter': S.portrait = null; S.chapter = op; S.mode = 'chapter'; return true;
       case 'testimony': startTestimony(op); return true;
+      case 'investigate': startInvestigate(op); return true;
       case 'demand':
         S.demand = op;
         sub([{ who: op.who, face: op.face, line: op.line }], () => openOverlay('demand'));
@@ -501,7 +522,7 @@
   function openOverlay(purpose) {
     if (S.overlay) return;
     S.overlay = { purpose, sel: 0 }; // purpose: view | cross | demand
-    if (S.mode !== 'line') S.mode = 'idle';
+    if (S.mode !== 'line' && S.mode !== 'inv') S.mode = 'idle';
     SFX.select();
   }
   function closeOverlay() {
@@ -511,8 +532,67 @@
     if (ov.purpose === 'cross') enterCross();
   }
 
+  // ───────── 조사 파트: 장소를 옮겨 다니며 살펴보고 사람과 이야기해 증거를 모은다 ─────────
+  let pendingInv = null; // 이어하기: 조사 도중에 저장한 상태
+  const evHas = (needs) => !needs || needs.every((id) => S.ev.includes(id));
+  function startInvestigate(op) {
+    const r = pendingInv && pendingInv.id === op.id ? pendingInv : null;
+    pendingInv = null;
+    S.inv = { op, place: r ? r.place : op.start, seen: r ? { ...r.seen } : {}, talked: r ? { ...r.talked } : {}, visited: r ? [...r.visited] : [], menu: 'main', sel: 0, acts: [] };
+    enterPlace(S.inv.place);
+  }
+  const invPlace = () => S.inv.op.places[S.inv.place];
+  function enterPlace(pid) {
+    const inv = S.inv, pl = inv.op.places[pid];
+    inv.place = pid; S.bg = pl.bg; S.portrait = null;
+    const first = !inv.visited.includes(pid);
+    if (first) inv.visited.push(pid);
+    if (first && pl.enter && pl.enter.length) { S.mode = 'idle'; sub(pl.enter, () => invMenu('main')); } else invMenu('main');
+  }
+  function invMenu(menu) {
+    const inv = S.inv, pl = invPlace();
+    inv.menu = menu; inv.sel = 0;
+    // 살펴보기 중에는 배경이 다 보이게 인물을 숨긴다
+    S.portrait = menu === 'examine' || !pl.who ? null : { id: pl.who, face: pl.face || 'normal' };
+    S.mode = 'inv';
+    save();
+  }
+  // 보이는 지점·주제는 필요한 증거를 가졌을 때만 열린다. key는 저장에 쓰는 이름
+  const invSpots = () => (invPlace().spots || []).map((s, i) => ({ s, key: `${S.inv.place}:${i}` })).filter((x) => evHas(x.s.needs));
+  const invTopics = () => (invPlace().talk || []).map((s, i) => ({ s, key: `${S.inv.place}:t${i}` })).filter((x) => evHas(x.s.needs));
+  const invMoves = () => (invPlace().move || Object.keys(S.inv.op.places).filter((k) => k !== S.inv.place)).filter((k) => evHas(S.inv.op.places[k].needs));
+  const invReady = () => evHas(S.inv.op.done.needs);
+  function invRun(x, book, back) {
+    if (S.mode !== 'inv') return;
+    const again = S.inv[book][x.key];
+    S.inv[book][x.key] = true;
+    S.mode = 'idle'; SFX.select();
+    sub(again && x.s.again ? x.s.again : x.s.lines, () => invMenu(back));
+  }
+  const examine = (x) => invRun(x, 'seen', 'examine');
+  const talk = (x) => invRun(x, 'talked', 'talk');
+  function moveTo(pid) { if (S.mode !== 'inv') return; SFX.select(); S.mode = 'idle'; enterPlace(pid); }
+  function finishInv() {
+    if (S.mode !== 'inv' || !invReady()) return;
+    const op = S.inv.op;
+    S.mode = 'idle'; SFX.ok();
+    sub(op.done.lines || [], () => { S.inv = null; S.portrait = null; step(); });
+  }
+  function invKey(k) {
+    const inv = S.inv, acts = inv.acts, n = acts.length;
+    const moveSel = (d) => { for (let i = 0; i < n; i++) { inv.sel = (inv.sel + d + n) % n; if (acts[inv.sel]) break; } SFX.select(); };
+    if (n && (k === 'ArrowUp' || k === 'ArrowLeft')) moveSel(-1);
+    else if (n && (k === 'ArrowDown' || k === 'ArrowRight')) moveSel(1);
+    else if (k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') { const f = acts[inv.sel]; if (f) f(); }
+    else if ((k === 'Escape' || k === 'x' || k === 'X') && inv.menu !== 'main') { invMenu('main'); SFX.select(); }
+    else if (k === 'e' || k === 'E') openOverlay('view');
+  }
+
   // ───────── 저장 1칸 ─────────
-  function snapshot() { return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted, bg: S.bg, pockets: S.pockets, stats: { ...S.stats } }; }
+  function snapshot() {
+    const inv = S.inv && { id: S.inv.op.id, place: S.inv.place, seen: { ...S.inv.seen }, talked: { ...S.inv.talked }, visited: [...S.inv.visited] };
+    return { pc: S.stack[0].pc, ev: [...S.ev], patience: S.patience, hinted: S.hinted, bg: S.bg, pockets: S.pockets, stats: { ...S.stats }, inv };
+  }
   function save() {
     S.saved = snapshot();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.saved)); } catch (e) { /* 저장소를 못 쓰면 이번 판에서만 기억 */ }
@@ -524,7 +604,10 @@
   function begin(from) {
     S.scene = 'play';
     if (!from) wrongCount = new WeakMap(); // 새 게임이면 힌트 단계도 처음부터
-    S.stack = [{ list: CASE.script, pc: from ? from.pc : 0 }];
+    // 조사 도중에 저장했다면 조사 명령부터 다시 실행해, 본 곳·나눈 이야기를 되살린다
+    pendingInv = from && from.inv ? from.inv : null;
+    S.stack = [{ list: CASE.script, pc: from ? from.pc - (from.inv ? 1 : 0) : 0 }];
+    S.inv = null;
     S.ev = from ? [...from.ev] : [...(CASE.startEvidence || [])];
     S.patience = MAX_PATIENCE; // 이어하기·다시하기 모두 하트를 채워서 시작
     S.stats = from && from.stats ? { ...from.stats } : { wrongs: 0, hints: 0, overs: 0, sec: 0 };
@@ -624,6 +707,7 @@
       e.preventDefault();
       return;
     }
+    if (S.mode === 'inv' && S.inv) { invKey(k); e.preventDefault(); return; }
     if (S.mode === 'cross') {
       if (k === 'ArrowLeft') crossMove(-1);
       else if (k === 'ArrowRight' || k === 'Enter' || k === ' ' || k === 'z' || k === 'Z') crossMove(1);
@@ -782,6 +866,15 @@
     if (S.bg === 'nightmare') { drawNightmare(); return; }
     if (S.bg === 'lobby') { drawLobby(); return; }
     if (S.bg === 'night') { drawNight(); return; }
+    if (S.bg !== 'court') {
+      const im = asset(`bg:${S.bg}`, `assets/bg/${S.bg}.png`, (i) => coverFrom(i, W, H));
+      if (im) { g.drawImage(im, 0, 0, W, H); return; }
+      // 그림이 아직 없으면 자리표시(장소 id를 적어 둔다)
+      rect(0, 0, W, H, '#2a2f44');
+      for (let y = 0; y < H; y += 12) rect(0, y, W, 1, '#323850');
+      if (im === null) text(S.bg, 160, 50, COL.dim, { align: 'center' });
+      return;
+    }
     const bg = asset('bg:court', 'assets/bg/court.png', (im) => coverFrom(im, W, H));
     if (bg) { g.drawImage(bg, 0, 0, W, H); return; }
     rect(0, 0, W, H, COL.wall);
@@ -824,10 +917,16 @@
       const on = i < S.patience, ox = 6 + i * 10, oy = 6;
       HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? COL.red : '#3a3040'); }));
     }
-    const can = S.mode === 'line' || S.mode === 'cross';
+    const can = S.mode === 'line' || S.mode === 'cross' || S.mode === 'inv';
     button(146, 3, 56, 16, keyHint('기록', 'L'), openLog, { off: !!S.overlay || !S.log.length });
     button(206, 3, 56, 16, keyHint(`${speed}배속`, 'F'), toggleSpeed, { off: !!S.overlay });
     button(266, 3, 50, 16, keyHint('증거', 'E'), () => openOverlay(S.mode === 'cross' ? 'cross' : 'view'), { off: !can || !!S.overlay });
+    if (S.inv) {
+      // 조사 중: 지금 장소 이름
+      const nm = S.inv.op.places[S.inv.place].name, w = tw(nm, true) + 14;
+      rect(4, 22, w, 15, COL.ink); rect(4, 22, 2, 15, COL.gold);
+      text(nm, 11, 22, COL.gold, { bold: true });
+    }
   }
   function drawNameTag(name) {
     if (!name) return;
@@ -862,6 +961,54 @@
     button(212, 84, 74, 18, keyHint('증거 내기', 'E'), () => openOverlay('cross'));
     button(290, 84, 26, 18, '▶', () => crossMove(1));
   }
+  function drawInv() {
+    const inv = S.inv, pl = invPlace(), acts = [];
+    const kb = pointer.x < 0; // 키보드로 고르는 중이면 고른 버튼을 강조
+    const btn = (x, y, w, h, label, fn, o = {}) => { const i = acts.length; acts.push(o.off ? null : fn); button(x, y, w, h, label, fn, { ...o, sel: !o.off && kb && inv.sel === i }); };
+    const DS = 10 / 12;
+    frameBox(4, 118, 312, 58);
+    if (inv.menu === 'main') {
+      const need = inv.op.done.needs || [], have = need.filter((id) => S.ev.includes(id)).length;
+      text(pl.desc || '무엇을 할까?', 12, 122, COL.dim, { scale: DS });
+      if (need.length) text(`단서 ${have}/${need.length}`, 308, 122, have === need.length ? COL.testimony : COL.gold, { scale: DS, align: 'right' });
+      btn(12, 134, 142, 18, '살펴보기', () => invMenu('examine'));
+      btn(166, 134, 142, 18, '이야기하기', () => invMenu('talk'), { off: !pl.who || !invTopics().length });
+      btn(12, 155, 142, 18, '이동하기', () => invMenu('move'), { off: !invMoves().length });
+      btn(166, 155, 142, 18, '조사 마치기', finishInv, { off: !invReady() });
+    } else if (inv.menu === 'examine') {
+      const xs = invSpots();
+      let hotName = null;
+      xs.forEach((x, i) => {
+        const s = x.s, seen = inv.seen[x.key];
+        const over = pointer.x >= s.x && pointer.x < s.x + s.w && pointer.y >= s.y && pointer.y < s.y + s.h;
+        const on = over || (kb && inv.sel === i);
+        if (on) { hotName = s.name; g.strokeStyle = COL.gold; g.lineWidth = 1; g.strokeRect(s.x + 0.5, s.y + 0.5, s.w - 1, s.h - 1); }
+        // 지점 표시: 아직 안 본 곳은 '?', 본 곳은 흐린 'v'
+        const mx = Math.round(s.x + s.w / 2 - 6), my = Math.round(s.y + s.h / 2 - 7);
+        rect(mx, my, 12, 14, on ? COL.gold : seen ? '#3a3850' : COL.ink);
+        rect(mx, my, 12, 1, COL.gold); rect(mx, my + 13, 12, 1, COL.gold);
+        text(seen ? 'v' : '?', mx + 6, my, on ? COL.ink : seen ? COL.dim : COL.gold, { align: 'center', bold: true });
+        acts.push(() => examine(x));
+        B.push({ x: s.x, y: s.y, w: s.w, h: s.h, fn: () => examine(x) });
+      });
+      const left = xs.filter((x) => !inv.seen[x.key]).length;
+      text(hotName || '살펴볼 곳을 누르자.', 12, 124, hotName ? COL.gold : COL.text, { bold: !!hotName });
+      text(left ? `아직 안 본 곳 ${left}` : '다 살펴봤다.', 12, 142, COL.dim, { scale: DS });
+      btn(228, 152, 80, 18, keyHint('돌아가기', 'X'), () => invMenu('main'));
+    } else {
+      const talkMode = inv.menu === 'talk';
+      const items = talkMode ? invTopics().map((x) => ({ label: (inv.talked[x.key] ? '· ' : '') + x.s.topic, fn: () => talk(x) }))
+        : invMoves().map((pid) => ({ label: inv.op.places[pid].name, fn: () => moveTo(pid) }));
+      const h = 12 + items.length * 20;
+      frameBox(64, Math.max(26, 112 - h), 192, h);
+      items.forEach((it, i) => btn(70, Math.max(26, 112 - h) + 6 + i * 20, 180, 18, it.label, it.fn));
+      text(talkMode ? '무엇을 물어볼까?' : '어디로 갈까?', 12, 124, COL.text);
+      if (talkMode) text('· 표시는 이미 나눈 이야기', 12, 142, COL.dim, { scale: DS });
+      btn(228, 152, 80, 18, keyHint('돌아가기', 'X'), () => invMenu('main'));
+    }
+    inv.acts = acts;
+    if (inv.sel >= acts.length || !acts[inv.sel]) inv.sel = Math.max(0, acts.findIndex(Boolean));
+  }
   function evIcon(id, x, y, k = 1) {
     const c = asset(`e:${id}`, `assets/evidence/${id}.png`, (im) => containFrom(im, 32, 32));
     if (c) { const iw = (c.width / RES) * k, ih = (c.height / RES) * k; g.drawImage(c, x + (32 * k - iw) / 2, y + (32 * k - ih) / 2, iw, ih); return; }
@@ -876,7 +1023,7 @@
     // 변호인 얼굴을 가리지 않게 오른쪽에 띄운다
     const x = 210, y = 20 + Math.round(rise * 60) + bob, w = 104, h = 84;
     frameBox(x, y, w, h);
-    text('주머니 속 증거품', x + w / 2, y + 4, COL.dim, { align: 'center', scale: 10 / 12 });
+    text(S.inv ? '새 증거품' : '주머니 속 증거품', x + w / 2, y + 4, COL.dim, { align: 'center', scale: 10 / 12 });
     evIcon(p.id, x + w / 2 - 24, y + 17, 1.5);
     wrap(ev.name, w - 10, true).slice(0, 2).forEach((s, i) => text(s, x + w / 2, y + 64 + i * 10, COL.gold, { align: 'center', bold: true, scale: 10 / 12 }));
   }
@@ -1055,6 +1202,7 @@
       if (S.mode === 'line' && S.line) drawLine();
       else if (S.mode === 'cross') drawCross();
       else if (S.mode === 'choice' && S.choice) drawChoice();
+      else if (S.mode === 'inv' && S.inv) drawInv();
       else frameBox(4, 118, 312, 58);
       if (S.pocket) drawPocket();
       // 위에 덮는 화면이 뜨면 아래 버튼은 눌리지 않게 비운다
@@ -1080,5 +1228,5 @@
   fonts.then(rewrapLine).catch(() => {});
 
   // 개발 확인용
-  window.__nayuta = { S, step, present, begin, dataErrors, music, resultText };
+  window.__nayuta = { S, step, present, begin, dataErrors, music, resultText, inv: { spots: () => invSpots(), topics: () => invTopics(), moves: () => invMoves(), examine, talk, moveTo, finish: finishInv, ready: () => invReady() } };
 })();
