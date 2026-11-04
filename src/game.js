@@ -265,7 +265,7 @@
     if (muted) return null;
     if (S.scene === 'title' || S.scene === 'skins') return 'title';
     if (S.scene !== 'play' || S.mode === 'chapter') return null;
-    if (S.bg === 'void') return 'mystery';
+    if (S.bg === 'void' || S.bg === 'nightmare') return 'mystery';
     if (S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand) return 'cross';
     return 'court';
   }
@@ -732,8 +732,19 @@
     }
     text('404 NOT FOUND', 160, 40, '#1f2050', { align: 'center', bold: true, scale: 2.5 });
   }
+  const NIGHTMARE = ['나유타 또 트롤함?', '정에 끌려서 일 그르침', '랩쳐 GOAT', '역적 아니냐', '해명방송 잘 봤습니다', 'ㅋㅋㅋㅋㅋ', '또 사고 칠 듯', '분신이 찔렀다고요?', '이게 맞냐', '나유타 손절'];
+  function drawNightmare() {
+    rect(0, 0, W, H, '#14060a');
+    for (let i = 0; i < 18; i++) {
+      const s = NIGHTMARE[i % NIGHTMARE.length], w = tw(s) * (10 / 12) + 10;
+      const x = 8 + ((i * 97) % (W - w - 16)), y = Math.round(((i * 41 + S.t * (10 + (i % 4) * 4)) % (H + 30))) - 20;
+      rect(x, H - y, w, 13, i % 3 ? '#2a0e14' : '#3a1018');
+      text(s, x + 5, H - y, i % 3 ? '#9a6070' : COL.red, { scale: 10 / 12 });
+    }
+  }
   function drawCourt() {
     if (S.bg === 'void') { drawVoid(); return; }
+    if (S.bg === 'nightmare') { drawNightmare(); return; }
     const bg = asset('bg:court', 'assets/bg/court.png', (im) => coverFrom(im, W, H));
     if (bg) { g.drawImage(bg, 0, 0, W, H); return; }
     rect(0, 0, W, H, COL.wall);
@@ -996,10 +1007,10 @@
     else {
       const sh = S.fx.shake > 0 ? 2 : 0;
       g.setTransform(RES, 0, 0, RES, sh ? Math.round(Math.random() * 4 - 2) * RES : 0, sh ? Math.round(Math.random() * 4 - 2) * RES : 0);
-      drawCourt(); drawPortrait(); if (S.bg !== 'void') drawStand();
+      drawCourt(); drawPortrait(); if (S.bg === 'court') drawStand();
       g.setTransform(RES, 0, 0, RES, 0, 0);
       drawHud();
-      if (S.fx.murmur && S.bg !== 'void') drawMurmur();
+      if (S.fx.murmur && S.bg === 'court') drawMurmur();
       if (S.mode === 'line' && S.line) drawLine();
       else if (S.mode === 'cross') drawCross();
       else if (S.mode === 'choice' && S.choice) drawChoice();
