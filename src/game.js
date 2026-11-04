@@ -238,6 +238,7 @@
     select: () => tone(660, 0.03, 'square', 0.03),
     give: () => { tone(784, 0.07); tone(1046, 0.14, 'square', 0.04, 0, 0.07); },
     murmur: () => { for (let i = 0; i < 6; i++) tone(180 + Math.random() * 120, 0.12, 'triangle', 0.02, -30, i * 0.07); },
+    gavel: () => { tone(110, 0.16, 'square', 0.08, -50); tone(80, 0.22, 'triangle', 0.08, -30, 0.05); },
     fanfare: () => [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, i === 5 ? 0.5 : 0.14, 'square', 0.04, 0, i * 0.14)),
   };
 
@@ -254,6 +255,8 @@
                bas: [48,0,55,0,52,0,55,0, 50,0,57,0,53,0,57,0, 48,0,55,0,52,0,55,0, 43,0,50,0,43,0,47,0] },
     cross:   { bpm: 132, mel: [74,0,74,72,74,0,77,0, 76,0,74,72,69,0,0,0, 74,0,74,72,74,0,79,0, 77,76,74,72,74,0,0,0],
                bas: [38,38,0,38,38,0,38,0, 36,36,0,36,36,0,36,0, 34,34,0,34,34,0,34,0, 33,33,0,33,40,0,40,0] },
+    danger:  { bpm: 150, mel: [69,0,70,0,69,0,68,0, 69,0,0,69,72,0,71,0, 69,0,70,0,69,0,68,0, 65,0,64,0,63,0,64,0],
+               bas: [45,45,45,45,45,45,45,45, 46,46,46,46,46,46,46,46, 45,45,45,45,45,45,45,45, 40,40,40,40,40,40,40,40] },
   };
   const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
   const music = { id: null, step: 0, next: 0 };
@@ -270,7 +273,9 @@
     if (S.inv) return 'invest';
     if (S.bg === 'void' || S.bg === 'nightmare' || S.bg === 'night') return 'mystery';
     if (S.bg === 'lobby') return 'title';
-    if (S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand) return 'cross';
+    const fight = S.mode === 'cross' || (S.overlay && S.overlay.purpose !== 'view') || S.demand;
+    if (S.patience <= 2 && (fight || S.test)) return 'danger';
+    if (fight) return 'cross';
     return 'court';
   }
   // 0.25초 앞까지 음을 미리 예약한다(프레임이 늦어도 박자가 흔들리지 않게)
@@ -321,6 +326,8 @@
       if (op.op === 'testimony') {
         needChar(op.witness, at);
         walk(op.wrong || [], at + '.wrong');
+        walk(op.after || [], at + '.after');
+        walk(op.loop || [], at + '.loop');
         op.statements.forEach((st, k) => {
           walk(st.press || [], `${at}.s${k + 1}.press`);
           for (const [ev, lb] of Object.entries(st.present || {})) { needEv(ev, `${at}.s${k + 1}`); needLabel(lb, `${at}.s${k + 1}`); }
@@ -385,7 +392,8 @@
         if (op.kind === 'shake') S.fx.shake = 0.35;
         if (op.kind === 'flash') S.fx.flash = 1;
         if (op.kind === 'murmur') { S.fx.murmur = { t: 1.6, text: op.text || '웅성웅성…' }; SFX.murmur(); }
-        if (op.kind === 'stamp') { S.fx.stamp = { text: op.text, t: 1.1 }; S.mode = 'stamp'; SFX.stamp(); return true; }
+        if (op.kind === 'gavel') { S.fx.shake = 0.25; S.fx.flash = 0.35; SFX.gavel(); }
+        if (op.kind === 'stamp') { S.fx.stamp = { text: op.text, t: 1.1, color: op.color }; S.mode = 'stamp'; SFX.stamp(); return true; }
         return false;
       case 'give': {
         if (S.ev.includes(op.id)) return false; // 같은 캐묻기를 다시 해도 한 번만 받는다
@@ -461,6 +469,7 @@
   function afterTestTitle() {
     const op = S.test.op;
     const lines = op.statements.map((st) => ({ who: op.witness, face: st.face, line: st.line, testimony: true }));
+    lines.push(...(op.after || [])); // 증언을 다 들은 뒤: 변호인의 고민, 검사의 도발
     if (!S.hinted) {
       S.hinted = true;
       lines.push({ who: null, color: COL.gold, line: '신문을 시작한다. ◀ ▶로 증언을 넘기고, 수상한 말은 캐묻거나 어긋나는 증거를 내자.' });
@@ -474,9 +483,18 @@
   }
   function crossMove(d) {
     if (S.mode !== 'cross') return;
-    const n = S.test.op.statements.length;
-    S.test.idx = (S.test.idx + d + n) % n;
+    const t = S.test, n = t.op.statements.length;
+    const wrapped = d > 0 && t.idx === n - 1;
+    t.idx = (t.idx + d + n) % n;
     SFX.select();
+    // 마지막 증언에서 처음으로 넘어가면, 증언마다 한 번 변호인이 고민한다
+    const pr = CASE.pressure || {};
+    if (wrapped && !t.looped && (t.op.loop || pr.loop)) {
+      t.looped = true;
+      S.mode = 'idle';
+      sub(t.op.loop || pick(pr.loop, 'loop'), enterCross);
+      return;
+    }
     enterCross();
   }
   function crossPress() {
@@ -496,6 +514,17 @@
     wrongCount.set(op, n + 1);
     return [{ who: 'me', line: hs[Math.min(n, hs.length - 1)] }];
   }
+  // 같은 경고가 되풀이되지 않게 차례로 돌려 쓴다
+  const pickN = {};
+  function pick(list, key) {
+    const n = pickN[key] || 0;
+    pickN[key] = n + 1;
+    return list[n % list.length];
+  }
+  function warnFor(left) {
+    const ws = (CASE.pressure || {})[left];
+    return ws && ws.length ? pick(ws, 'w' + left) : [];
+  }
   function wrong(lines, then, op) {
     S.patience = Math.max(0, S.patience - 1);
     S.fx.shake = 0.4; SFX.wrong();
@@ -503,7 +532,7 @@
     S.fx.murmur = { t: 1.4, text: '수군수군…' }; // 방청석이 웃음 섞인 반응
     const ls = lines && lines.length ? lines : [{ who: 'judge', line: '그 증거로는 아무것도 증명되지 않습니다.' }];
     S.overlay = null; S.mode = 'idle';
-    sub(S.patience > 0 ? [...ls, ...hintFor(op)] : ls, () => { if (S.patience <= 0) gameOver(); else then(); });
+    sub(S.patience > 0 ? [...ls, ...warnFor(S.patience), ...hintFor(op)] : ls, () => { if (S.patience <= 0) gameOver(); else then(); });
   }
   function present(id) {
     const ov = S.overlay;
@@ -911,12 +940,23 @@
     const pw = c.width / RES, ph = c.height / RES;
     g.drawImage(c, 160 - pw / 2, 118 - ph, pw, ph);
   }
+  function drawDanger() {
+    if (S.patience > 2) return;
+    const fast = S.patience === 1, a = (fast ? 0.6 : 0.35) * (0.7 + 0.3 * Math.sin(S.t * (fast ? 9 : 5)));
+    for (let i = 0; i < 8; i++) {
+      const c = `rgba(210,20,30,${(a * (1 - i / 8)).toFixed(3)})`;
+      rect(i * 2, 0, 2, H, c); rect(W - 2 - i * 2, 0, 2, H, c);
+      rect(0, i * 2, W, 2, c); rect(0, H - 2 - i * 2, W, 2, c);
+    }
+  }
   const HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
   function drawHud() {
     for (let i = 0; i < MAX_PATIENCE; i++) {
       const on = i < S.patience, ox = 6 + i * 10, oy = 6;
-      HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? COL.red : '#3a3040'); }));
+      const blink = S.patience === 1 && Math.floor(S.t * 4) % 2;
+      HEART.forEach((row, y) => [...row].forEach((v, x) => { if (v === '1') rect(ox + x, oy + y, 1, 1, on ? (blink ? COL.gold : COL.red) : '#3a3040'); }));
     }
+    if (S.patience === 1) { const w = tw('종결 경고', true) + 8; rect(58, 3, w, 14, COL.red); text('종결 경고', 62, 3, COL.text, { bold: true }); }
     const can = S.mode === 'line' || S.mode === 'cross' || S.mode === 'inv';
     button(146, 3, 56, 16, keyHint('기록', 'L'), openLog, { off: !!S.overlay || !S.log.length });
     button(206, 3, 56, 16, keyHint(`${speed}배속`, 'F'), toggleSpeed, { off: !!S.overlay });
@@ -1073,7 +1113,7 @@
     const st = S.fx.stamp;
     const k = Math.min(1, (1.1 - st.t) * 8);
     const h = Math.round(36 * k);
-    rect(0, 72 - h / 2, W, h, COL.red);
+    rect(0, 72 - h / 2, W, h, st.color || COL.red);
     rect(0, 72 - h / 2 - 2, W, 2, COL.gold); rect(0, 72 + h / 2, W, 2, COL.gold);
     if (k >= 1) text(st.text, 160, 59, COL.text, { align: 'center', bold: true, scale: 2, outline: COL.ink });
   }
@@ -1211,6 +1251,7 @@
       g.setTransform(RES, 0, 0, RES, sh ? Math.round(Math.random() * 4 - 2) * RES : 0, sh ? Math.round(Math.random() * 4 - 2) * RES : 0);
       drawCourt(); drawPortrait(); if (S.bg === 'court') drawStand();
       g.setTransform(RES, 0, 0, RES, 0, 0);
+      drawDanger();
       drawHud();
       if (S.fx.murmur && S.bg === 'court') drawMurmur();
       if (S.mode === 'line' && S.line) drawLine();

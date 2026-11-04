@@ -81,16 +81,18 @@ PNG 파일을 아래 이름으로 넣으면 게임이 32색 도트 그림으로 
 |---|---|
 | 대사 | `{ who: 'nayuta', face: 'sad', line: '…' }` (`who: null`이면 이름 없는 안내문, `me`는 지휘관. `(`로 시작하는 지휘관 대사는 속마음 색) |
 | 장 제목 | `{ op: 'chapter', text: '제1심', sub: '독잔 사건' }` |
-| 증언 | `{ op: 'testimony', title, witness, statements: [{ line, face, press: [대사…], present: { 증거id: 'label' } }], wrong: [대사…] }` |
+| 증언 | `{ op: 'testimony', title, witness, statements: [{ line, face, press: [대사…], present: { 증거id: 'label' } }], after: [대사…], loop: [대사…], hints: ['…'], wrong: [대사…] }` — `after` = 증언을 다 들은 뒤 신문 전에 나오는 대사(변호인의 고민·검사의 도발), `loop` = 증언을 한 바퀴 돌았을 때 한 번 나오는 고민(없으면 `CASE.pressure.loop`) |
 | 증거 요구 | `{ op: 'demand', who, line, answer: 증거id, ok: 'label', wrong: [대사…] }` |
 | 증거 받기 | `{ op: 'give', id: 'e3' }` |
 | 표시·이동 | `{ op: 'label', id }` · `{ op: 'goto', id }` |
-| 연출 | `{ op: 'fx', kind: 'stamp' \| 'shake' \| 'flash', text }` |
+| 연출 | `{ op: 'fx', kind: 'stamp' \| 'shake' \| 'flash' \| 'gavel', text, color }` — `gavel` = 재판봉(흔들림 + 소리), `stamp`의 `color`로 띠 색을 바꾼다(노벨의 이의 = `#6a3a9a`) |
 | 배경 | `{ op: 'bg', id }` — `court`·`void`·`nightmare`·`lobby`·`night`는 정해진 배경, 그 밖의 id는 `assets/bg/<id>.png`(지금 `edenlab`·`coffin`·`battle`) |
 | 조사 | `{ op: 'investigate', id, start, places: { 장소id: { name, bg, who, desc, move: [장소id], enter: [대사…], spots: [{ name, x, y, w, h, needs, lines: [대사…], again: [대사…] }], talk: [{ topic, needs, lines, again }] } }, done: { needs: [증거id], lines } }` — 좌표는 320×180 기준, `needs`의 증거를 가져야 그 지점·주제·장소가 열린다. 조사 중 `give`는 "새 증거품" 카드로 보인다 |
 | 초상 숨기기 | `{ op: 'hide' }` |
 | 저장 지점 | `{ op: 'save' }` (여기서 하트가 다시 다 찬다) |
 | 끝 | `{ op: 'end', result: 'win', title, text }` |
+
+**재판의 압박(`CASE.pressure`)**: 오답 뒤 하트가 2개·1개 남으면 `pressure[2]`·`pressure[1]`의 경고를 차례로 돌려 쓴다. 하트가 2개 이하면 화면 가장자리가 붉게 맥박치고 음악이 위기곡으로 바뀌며, 1개면 "종결 경고"가 뜬다.
 
 없는 인물·증거·label을 가리키면 타이틀 왼쪽 위에 "데이터 오류 N건"이 뜨고, 브라우저 콘솔에 목록이 나온다.
 
