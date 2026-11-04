@@ -149,7 +149,7 @@ const pick = (a) => a[Math.floor(rnd() * a.length)];
 
 // 낱말 겹침 점수: 증언과 증거(이름+설명)에 같은 한글 두 글자 조각이 몇 개 겹치는지
 const grams = (t) => { const g = new Set(); const h = t.replace(/[^가-힣A-Za-z0-9]/g, ''); for (let i = 0; i < h.length - 1; i++) g.add(h.slice(i, i + 2)); return g; };
-const evGrams = Object.fromEntries(Object.entries(C.evidence).map(([k, v]) => [k, grams(v.name + v.desc)]));
+const evGrams = Object.fromEntries(Object.entries(C.evidence).map(([k, v]) => [k, grams(v.name + (v.from || '') + v.desc)]));
 const score = (text, id) => { const a = grams(text); let n = 0; for (const x of a) if (evGrams[id].has(x)) n++; return n; };
 const softPick = (cands, beta = 0.6) => { const w = cands.map((c) => Math.exp(beta * c.sc)); let r = rnd() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return cands[i]; } return cands[cands.length - 1]; };
 

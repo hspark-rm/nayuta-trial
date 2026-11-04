@@ -865,12 +865,14 @@
       const ev = CASE.evidence[id];
       rect(124, 30, 178, 1, COL.trim);
       evIcon(id, 126, 36);
-      wrap(ev.name, 136, true).slice(0, 2).forEach((s, i) => text(s, 164, 36 + i * 14, COL.gold, { bold: true }));
-      // 설명은 10px로 쓰고, 6줄이 넘으면 '설명 1/2' 버튼으로 넘겨 본다
-      const DS = 10 / 12, per = 6;
+      const DS = 10 / 12, per = 7;
+      text(ev.name, 164, 36, COL.gold, { bold: true, clip: 136 });
+      // 출처는 이름 아래 한 줄로 따로 빼서, 설명 칸을 사실에만 쓴다
+      if (ev.from) text(ev.from, 164, 52, COL.dim, { scale: DS, clip: 136 / DS });
+      // 설명은 10px로 쓰고, 7줄이 넘으면 '설명 1/2' 버튼으로 넘겨 본다
       const desc = wrap(ev.desc, 170 / DS), pages = Math.ceil(desc.length / per);
       if (!(ov.page < pages)) ov.page = 0;
-      desc.slice(ov.page * per, ov.page * per + per).forEach((s, i) => text(s, 128, 72 + i * 12, COL.text, { scale: DS }));
+      desc.slice(ov.page * per, ov.page * per + per).forEach((s, i) => text(s, 128, 68 + i * 11, COL.text, { scale: DS }));
       if (pages > 1) button(128, 148, 60, 18, `설명 ${ov.page + 1}/${pages}`, () => { ov.page = (ov.page + 1) % pages; SFX.select(); });
     }
     if (ov.purpose !== 'view') button(192, 148, 54, 18, keyHint('제시', 'Z'), () => present(S.ev[ov.sel]), { off: !S.ev.length });
