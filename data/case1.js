@@ -7,8 +7,8 @@ window.CASE = {
 
   // 인물. voice = 대사 효과음 높이(Hz), color = 그림이 없을 때 자리표시 색
   chars: {
-    judge:      { name: '재판장',  voice: 180, color: '#8a7a5a' },
-    prosecutor: { name: '검사',    voice: 140, color: '#5a6a9a' },
+    judge:      { name: '에닉',    voice: 180, color: '#8a7a5a' },  // 재판장 = 방주 관리 AI 에닉
+    prosecutor: { name: '노벨',    voice: 140, color: '#5a6a9a' },  // 검사 = 니케 노벨
     nayuta:     { name: '나유타',  voice: 300, color: '#5aa0a0' },
     anis:       { name: '아니스',  voice: 420, color: '#d8a040' },
     hongryeon:  { name: '홍련',    voice: 260, color: '#c04848' },

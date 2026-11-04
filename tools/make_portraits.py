@@ -33,6 +33,7 @@ FACES = {
     "anis": ["normal", "smile", "shock"],
     "anis_star": ["normal", "smile", "shock"],  # 아니스: 스타(팝스타 의상), 아직 시나리오에 등장 전
     "hongryeon": ["normal", "drunk", "shock"],
+    "judge": ["normal", "stern"],  # 재판장 = 니케 노벨
 }
 FACE_DESC = {
     "normal": "calm, neutral expression",
@@ -40,6 +41,7 @@ FACE_DESC = {
     "smile": "gentle, warm smile",
     "shock": "shocked expression, wide eyes, mouth open, a small sweat drop",
     "drunk": "tipsy expression, flushed red cheeks, half-closed eyes, relaxed grin",
+    "stern": "stern, serious expression, narrowed eyes, closed mouth",
 }
 STYLE = ("16-bit retro game pixel art, clearly visible chunky square pixels, limited palette of about 32 colors, "
          "clean dark 1-pixel outline, no anti-aliasing, no dithering noise. "
