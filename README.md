@@ -8,7 +8,7 @@
 > 참고: 시프트업 2차 창작 가이드라인(policy.shiftup.co.kr/ip) 제3조는 게임 IP로 게임을 만들어 배포하는 것을 원칙적으로 허용하지 않는다.
 > 위 문구를 달고 공개하되, 요청이 오면 저장소와 GitHub Pages를 바로 내린다. 모델 원본 출력(`assets/raw/`)은 올리지 않는다.
 
-플레이: <https://hspark-rm.github.io/nayuta-trial/>
+플레이: <https://nayuta-trial.pages.dev/> (Cloudflare Pages, `tools/deploy_cf.sh`로 올림)
 
 제작: 유기농쵸비 · 피드백: globalchmist@naver.com
 
