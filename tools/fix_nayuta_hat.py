@@ -43,9 +43,8 @@ for f in sorted(glob.glob('assets/portraits/nayuta_*.png')):
         for dy,dx in ((1,0),(-1,0),(0,1),(0,-1)):
             ny,nx=y+dy,x+dx
             if 0<=ny<H and 0<=nx<W and cand[ny,nx] and not hole[ny,nx]: hole[ny,nx]=True; q.append((ny,nx,dd+1))
-    # 밝은 삿갓 면의 대표색 하나로 평평하게 채운다(도트 그림의 면 처리)
-    src=hat&~pink&(lum>150)&(a>=250)
-    col=np.median(im[src][:,:3],axis=0)
+    # 원본 그림에서 이 자리는 빛을 받아 흰색이다 → 흰색 한 가지로 평평하게 채운다(도트 그림의 면 처리)
+    col=np.array([238,234,226])
     o=im.copy(); o[hole,:3]=col; o[hole,3]=255
     o=Image.fromarray(o.astype(np.uint8))
     o.save(f if SAVE else S+'/fix_'+f.split('/')[-1])
